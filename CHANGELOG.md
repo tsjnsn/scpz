@@ -7,10 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-05-16
+
 ### Changed
 - Updated AWS SCP limits to match new quotas announced May 2026:
   - `MAX_SCP_SIZE_BYTES`: 5,120 → 10,240 bytes
   - `MAX_SCPS_PER_TARGET`: 5 → 10 SCPs per node
+- README: document `redundancyEliminate`, `fixpoint`, catalog config, and `schema` command
+- `examples/scpz.yaml`: add `fixpoint` pass to reference config
 
 ## [0.1.0] - 2026-05-16
 
@@ -25,5 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dry-run and summary-only modes
 - Rich terminal output with diffs and optimization summaries
 
-[Unreleased]: https://github.com/tsjnsn/scpz/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/tsjnsn/scpz/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/tsjnsn/scpz/compare/v0.1.0...v0.2.1
 [0.1.0]: https://github.com/tsjnsn/scpz/releases/tag/v0.1.0

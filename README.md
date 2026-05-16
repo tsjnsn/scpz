@@ -63,14 +63,40 @@ scpz validate policies/
 
 ## Optimization Passes
 
-scpz runs the following optimizations in order:
+scpz runs the following optimizations in order, repeating until the output stops changing (up to 5 rounds):
 
 1. **Statement merging** — Combines statements that share the same Effect, Condition, and Resource into a single statement with a unioned Action list.
-2. **Action wildcard compression** — Replaces groups of actions sharing a common prefix with wildcard patterns (e.g. `s3:GetObject` + `s3:GetBucketPolicy` → `s3:Get*`).
+2. **Action wildcard compression** — Replaces groups of actions sharing a common prefix with wildcard patterns (e.g. `s3:GetObject` + `s3:GetBucketPolicy` → `s3:Get*`). Uses the bundled AWS action catalog in conservative mode to avoid scope broadening.
 3. **Condition merging** — Deduplicates condition values and merges equivalent condition blocks.
 4. **Resource ARN optimization** — Collapses multiple specific ARNs into wildcard patterns (e.g. `role/Admin` + `role/ReadOnly` → `role/*`).
+5. **Redundancy elimination** _(opt-in)_ — Removes statements wholly subsumed by another statement in the same policy. Enable with `redundancyEliminate.enabled: true` in `scpz.yaml`.
 
 When a policy still exceeds limits after optimization, scpz automatically splits it into multiple SCP documents (up to 10 per target).
+
+## Configuration
+
+Place a `scpz.yaml` in your project root (scpz walks up from the input file to find it). See `examples/scpz.yaml` for a fully-annotated reference.
+
+```yaml
+apiVersion: scpz.io/v1alpha1
+kind: OptimizerConfig
+metadata:
+  name: default
+spec:
+  optimizer:
+    actionCompress:
+      mode: conservative  # conservative | aggressive
+    redundancyEliminate:
+      enabled: true       # opt-in
+```
+
+```bash
+# Print the JSON Schema for editor validation
+scpz schema
+
+# Regenerate the committed schema after model changes
+scpz schema -o schema/OptimizerConfig.json
+```
 
 ## Development
 

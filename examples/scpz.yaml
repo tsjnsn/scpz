@@ -93,6 +93,14 @@ spec:
       enabled: true
       strategy: auto          # auto | never
 
+    # Re-runs all passes in sequence until the minified document stops
+    # changing or maxRounds is reached. Lets later passes (e.g.
+    # conditionMerge) unlock earlier ones (e.g. statementMerge) on
+    # subsequent rounds. Enabled by default.
+    fixpoint:
+      enabled: true
+      maxRounds: 5            # maximum number of full-pipeline repetitions
+
   # ── Validation (planned) ───────────────────────────────────────────
   # Tunes the severity of individual validation checks. Each rule accepts:
   #   error  - block optimization and exit non-zero
