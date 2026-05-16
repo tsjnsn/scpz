@@ -11,9 +11,9 @@ Intelligently optimize AWS Service Control Policy (SCP) JSONs to fit within AWS'
 
 | Constraint | Limit |
 |---|---|
-| Policy size | 5,120 bytes |
+| Policy size | 10,240 bytes |
 | Statements per SCP | 5 |
-| SCPs per target (account/OU) | 5 |
+| SCPs per target (account/OU) | 10 |
 
 ## Installation
 
@@ -70,7 +70,7 @@ scpz runs the following optimizations in order:
 3. **Condition merging** — Deduplicates condition values and merges equivalent condition blocks.
 4. **Resource ARN optimization** — Collapses multiple specific ARNs into wildcard patterns (e.g. `role/Admin` + `role/ReadOnly` → `role/*`).
 
-When a policy still exceeds limits after optimization, scpz automatically splits it into multiple SCP documents (up to 5 per target).
+When a policy still exceeds limits after optimization, scpz automatically splits it into multiple SCP documents (up to 10 per target).
 
 ## Development
 

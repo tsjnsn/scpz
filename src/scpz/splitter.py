@@ -2,7 +2,7 @@
 
 When a single SCP cannot fit within AWS limits even after optimization,
 this module splits it into multiple documents while respecting the
-5-SCP-per-target constraint.
+10-SCP-per-target constraint.
 """
 
 from __future__ import annotations

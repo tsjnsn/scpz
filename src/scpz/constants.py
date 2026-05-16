@@ -1,9 +1,10 @@
 """AWS SCP constants and limits."""
 
 # ── AWS SCP hard limits ──────────────────────────────────────────────
-MAX_SCP_SIZE_BYTES: int = 5_120
+# Limits updated May 2026: https://aws.amazon.com/about-aws/whats-new/2026/05/aws-organizations-increased-scp-quotas/
+MAX_SCP_SIZE_BYTES: int = 10_240
 MAX_STATEMENTS_PER_SCP: int = 5
-MAX_SCPS_PER_TARGET: int = 5
+MAX_SCPS_PER_TARGET: int = 10
 
 # ── SCP JSON structure ───────────────────────────────────────────────
 VALID_EFFECTS: frozenset[str] = frozenset({"Allow", "Deny"})

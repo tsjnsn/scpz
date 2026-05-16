@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Updated AWS SCP limits to match new quotas announced May 2026:
+  - `MAX_SCP_SIZE_BYTES`: 5,120 → 10,240 bytes
+  - `MAX_SCPS_PER_TARGET`: 5 → 10 SCPs per node
+
 ## [0.1.0] - 2026-05-16
 
 ### Added
