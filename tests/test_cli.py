@@ -5,15 +5,52 @@ from __future__ import annotations
 import json
 import shutil
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 from typer.testing import CliRunner
 
 from scpz.cli import app
+from scpz.splitter import SplitError
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 runner = CliRunner()
+
+
+def _needs_split_policy(tmp_path: Path) -> Path:
+    """Write a policy that is too large/has too many statements to fit in one SCP.
+
+    Uses 20 statements each with a unique condition so they cannot be merged.
+    The statement count (20 > 5) ensures fits_single_scp is False after optimization.
+    """
+    actions = [
+        "s3:GetObject", "s3:PutObject", "s3:DeleteObject",
+        "s3:ListBucket", "s3:GetBucketPolicy", "s3:PutBucketPolicy",
+        "ec2:DescribeInstances", "ec2:StartInstances", "ec2:StopInstances",
+        "iam:CreateUser", "iam:DeleteUser", "iam:AttachUserPolicy",
+    ]
+    statements = [
+        {
+            "Sid": f"DenyRegion{i:02d}",
+            "Effect": "Deny",
+            "Action": actions,
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestedRegion": f"ap-southeast-{i + 1}",
+                    "aws:PrincipalTag/CostCenter": f"cost-center-{i:04d}",
+                }
+            },
+        }
+        for i in range(20)
+    ]
+    path = tmp_path / "needs_split.json"
+    path.write_text(
+        json.dumps({"Version": "2012-10-17", "Statement": statements}),
+        encoding="utf-8",
+    )
+    return path
 
 
 class TestVersion:
@@ -36,6 +73,75 @@ class TestValidateCommand:
     def test_validate_missing_file(self) -> None:
         result = runner.invoke(app, ["validate", "/nonexistent.json"])
         assert result.exit_code == 1
+
+
+class TestSchemaCommand:
+    def test_stdout_is_valid_json(self) -> None:
+        result = runner.invoke(app, ["schema"])
+        assert result.exit_code == 0
+        schema = json.loads(result.output)
+        assert schema.get("title") == "OptimizerConfig"
+
+    def test_writes_to_file(self, tmp_path: Path) -> None:
+        out = tmp_path / "schema.json"
+        result = runner.invoke(app, ["schema", "-o", str(out)])
+        assert result.exit_code == 0
+        assert out.exists()
+        assert json.loads(out.read_text()).get("title") == "OptimizerConfig"
+
+
+class TestOptimizeErrors:
+    def test_empty_dir_exits_1(self, tmp_path: Path) -> None:
+        result = runner.invoke(app, ["optimize-cmd", str(tmp_path)])
+        assert result.exit_code == 1
+
+    def test_bad_config_exits_1(self, fixtures_dir: Path, tmp_path: Path) -> None:
+        """Invalid scpz.yaml discovered while walking up triggers config error."""
+        (tmp_path / "scpz.yaml").write_text(
+            "apiVersion: bad\nkind: Bad\n", encoding="utf-8"
+        )
+        shutil.copy2(fixtures_dir / "simple_deny.json", tmp_path / "policy.json")
+        result = runner.invoke(app, ["optimize-cmd", str(tmp_path / "policy.json")])
+        assert result.exit_code == 1
+
+    def test_unparseable_scp_exits_1(self, tmp_path: Path) -> None:
+        """A JSON file that cannot be parsed as an SCP causes exit 1."""
+        bad = tmp_path / "bad.json"
+        bad.write_text('{"no": "statement"}', encoding="utf-8")
+        result = runner.invoke(app, ["optimize-cmd", str(bad)])
+        assert result.exit_code == 1
+
+    def test_no_split_oversized_exits_1(self, tmp_path: Path) -> None:
+        policy = _needs_split_policy(tmp_path)
+        result = runner.invoke(app, ["optimize-cmd", str(policy), "--no-split"])
+        assert result.exit_code == 1
+
+    def test_split_error_propagates(self, tmp_path: Path) -> None:
+        policy = _needs_split_policy(tmp_path)
+        with patch("scpz.cli.split_if_needed", side_effect=SplitError("too complex")):
+            result = runner.invoke(app, ["optimize-cmd", str(policy)])
+        assert result.exit_code == 1
+
+
+class TestOptimizeSplit:
+    def test_dry_run(self, tmp_path: Path) -> None:
+        result = runner.invoke(
+            app, ["optimize-cmd", str(_needs_split_policy(tmp_path)), "--dry-run"]
+        )
+        assert result.exit_code == 0
+
+    def test_summary_only(self, tmp_path: Path) -> None:
+        result = runner.invoke(
+            app, ["optimize-cmd", str(_needs_split_policy(tmp_path)), "--summary-only"]
+        )
+        assert result.exit_code == 0
+
+    def test_writes_multiple_files(self, tmp_path: Path) -> None:
+        policy = _needs_split_policy(tmp_path)
+        result = runner.invoke(app, ["optimize-cmd", str(policy)])
+        assert result.exit_code == 0
+        written = sorted(tmp_path.glob("needs_split_*.json"))
+        assert len(written) > 1
 
 
 class TestOptimizeCommand:
@@ -76,3 +182,43 @@ class TestOptimizeCommand:
         )
         assert result.exit_code == 0
         assert out.exists()
+
+    def test_dry_run_already_optimal_shows_no_changes(
+        self, fixtures_dir: Path, tmp_path: Path
+    ) -> None:
+        """A second dry-run pass on an already-optimized file produces an empty diff."""
+        src = fixtures_dir / "simple_deny.json"
+        out = tmp_path / "optimized.json"
+        # Produce the canonical optimized form first
+        runner.invoke(app, ["optimize-cmd", str(src), "--output", str(out)])
+        # Second pass: optimizer has nothing left to change
+        result = runner.invoke(app, ["optimize-cmd", str(out), "--dry-run"])
+        assert result.exit_code == 0
+
+
+class TestValidateErrors:
+    def test_empty_dir_exits_1(self, tmp_path: Path) -> None:
+        result = runner.invoke(app, ["validate", str(tmp_path)])
+        assert result.exit_code == 1
+
+    def test_unparseable_scp_exits_1(self, tmp_path: Path) -> None:
+        """A JSON file without a Statement key fails file-level validation."""
+        bad = tmp_path / "bad.json"
+        bad.write_text('{"no": "statement"}', encoding="utf-8")
+        result = runner.invoke(app, ["validate", str(bad)])
+        assert result.exit_code == 1
+
+    def test_malformed_action_exits_1(self, tmp_path: Path) -> None:
+        """A valid SCP structure with a malformed action fails document-level validation."""
+        bad = tmp_path / "bad_action.json"
+        bad.write_text(
+            json.dumps({
+                "Version": "2012-10-17",
+                "Statement": [
+                    {"Effect": "Deny", "Action": ["not-a-valid-action"], "Resource": "*"}
+                ],
+            }),
+            encoding="utf-8",
+        )
+        result = runner.invoke(app, ["validate", str(bad)])
+        assert result.exit_code == 1

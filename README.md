@@ -1,5 +1,10 @@
 # scpz
 
+[![CI](https://github.com/tsjnsn/scpz/actions/workflows/ci.yml/badge.svg)](https://github.com/tsjnsn/scpz/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/scpz)](https://pypi.org/project/scpz/)
+[![Python](https://img.shields.io/pypi/pyversions/scpz)](https://pypi.org/project/scpz/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Intelligently optimize AWS Service Control Policy (SCP) JSONs to fit within AWS's strict limits.
 
 ## AWS SCP Limits
