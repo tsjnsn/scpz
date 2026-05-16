@@ -25,10 +25,18 @@ def _needs_split_policy(tmp_path: Path) -> Path:
     The statement count (20 > 5) ensures fits_single_scp is False after optimization.
     """
     actions = [
-        "s3:GetObject", "s3:PutObject", "s3:DeleteObject",
-        "s3:ListBucket", "s3:GetBucketPolicy", "s3:PutBucketPolicy",
-        "ec2:DescribeInstances", "ec2:StartInstances", "ec2:StopInstances",
-        "iam:CreateUser", "iam:DeleteUser", "iam:AttachUserPolicy",
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket",
+        "s3:GetBucketPolicy",
+        "s3:PutBucketPolicy",
+        "ec2:DescribeInstances",
+        "ec2:StartInstances",
+        "ec2:StopInstances",
+        "iam:CreateUser",
+        "iam:DeleteUser",
+        "iam:AttachUserPolicy",
     ]
     statements = [
         {
@@ -97,9 +105,7 @@ class TestOptimizeErrors:
 
     def test_bad_config_exits_1(self, fixtures_dir: Path, tmp_path: Path) -> None:
         """Invalid scpz.yaml discovered while walking up triggers config error."""
-        (tmp_path / "scpz.yaml").write_text(
-            "apiVersion: bad\nkind: Bad\n", encoding="utf-8"
-        )
+        (tmp_path / "scpz.yaml").write_text("apiVersion: bad\nkind: Bad\n", encoding="utf-8")
         shutil.copy2(fixtures_dir / "simple_deny.json", tmp_path / "policy.json")
         result = runner.invoke(app, ["optimize-cmd", str(tmp_path / "policy.json")])
         assert result.exit_code == 1
@@ -212,12 +218,14 @@ class TestValidateErrors:
         """A valid SCP structure with a malformed action fails document-level validation."""
         bad = tmp_path / "bad_action.json"
         bad.write_text(
-            json.dumps({
-                "Version": "2012-10-17",
-                "Statement": [
-                    {"Effect": "Deny", "Action": ["not-a-valid-action"], "Resource": "*"}
-                ],
-            }),
+            json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {"Effect": "Deny", "Action": ["not-a-valid-action"], "Resource": "*"}
+                    ],
+                }
+            ),
             encoding="utf-8",
         )
         result = runner.invoke(app, ["validate", str(bad)])
