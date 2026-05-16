@@ -2,7 +2,7 @@ $ pip install scpz
 ...
 
 $ scpz --version
-scpz 0.2.5
+scpz 0.2.6
 
 $ scpz --help
 
