@@ -118,8 +118,9 @@ def _collapse_resource_parts(arn_prefix: str, parts: list[str]) -> list[str]:
             # producing a tighter pattern than the blanket type/*.
             if lcp:
                 wildcard = f"{arn_prefix}:{rtype}/{lcp}*"
-                expanded_size = sum(len(a) for a in expanded) + len(expanded) - 1
-                if len(wildcard) < expanded_size:
+                # JSON-accurate byte count: each string needs 2 quote chars.
+                expanded_size = sum(len(a) + 2 for a in expanded) + len(expanded) - 1
+                if len(wildcard) + 2 < expanded_size:
                     result.append(wildcard)
                     continue
         result.extend(expanded)

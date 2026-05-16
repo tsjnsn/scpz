@@ -1,23 +1,45 @@
 """Action wildcard compression.
 
 Replaces groups of actions sharing a common prefix with a single wildcard
-pattern, but only when the longest common prefix (LCP) of the action names
-extends *beyond* the verb prefix.  This keeps wildcards semantically tight:
+pattern using a trie-based recursive algorithm:
 
-  iam:DeleteRole + iam:DeleteRolePolicy  -> iam:DeleteRole*   (LCP > verb)
-  iam:UpdateRole + iam:UpdateAssumeRolePolicy -> kept explicit (LCP == verb)
-  logs:DeleteLogGroup + logs:DeleteLogStream  -> logs:DeleteLog* (LCP > verb)
-  guardduty:DeleteDetector + guardduty:DeleteMembers -> kept explicit
+1. Group actions by service prefix.
+2. Within each service, group by CamelCase verb (first word).
+3. For each verb group, recursively search for sub-groups that share a
+   longer common prefix and can be safely wildcarded.
+
+Examples::
+
+  iam:CreatePolicy + iam:CreatePolicyVersion + iam:CreateRole
+      -> iam:CreatePolicy*  +  iam:CreateRole       (sub-group found)
+
+  iam:DeleteRole + iam:DeleteRolePolicy
+      -> iam:DeleteRole*                             (LCP > verb)
+
+  guardduty:DeleteDetector + guardduty:DeleteMembers
+      -> kept explicit                               (sub-groups are singletons)
 
 Catalog safety in conservative mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When a catalog is provided, it is used to guard *both* wildcard levels:
+When a catalog is provided, it guards wildcards at every trie level:
 
-- LCP wildcard (``svc:LCP*``): emitted only when the catalog confirms that
-  no action starting with LCP exists beyond those already in the statement.
-  Without a catalog the LCP heuristic is trusted as-is.
-- Verb wildcard (``svc:Verb*``): emitted only when the catalog confirms full
-  verb-level coverage (every ``Verb*`` catalog action is in the statement).
+- A wildcard ``svc:prefix*`` is emitted only when the catalog confirms that
+  every catalog action starting with *prefix* is already in the statement
+  (or sub-group).  Without a catalog the LCP heuristic is trusted as-is.
+- If a prefix-level wildcard is blocked, the catalog is also checked for the
+  verb-level wildcard (``svc:Verb*``) when names diverge immediately at the
+  verb level.
+
+Byte-cost formula
+~~~~~~~~~~~~~~~~~
+Wildcard acceptance uses JSON-accurate byte counts: each string contributes
+``len + 2`` bytes (the surrounding quotes), so the formula is
+
+    wildcard_bytes = len(wildcard) + 2
+    expanded_bytes = sum(len(a) + 2 for a in expanded) + (n - 1)   # commas
+
+This is more accurate than a raw character count and catches marginal cases
+the simpler formula misses.
 """
 
 from __future__ import annotations
@@ -42,13 +64,12 @@ def compress_actions(
     *mode* controls aggressiveness:
 
     conservative
-        Wildcard only when the LCP of action names extends beyond the verb
-        prefix, producing tight patterns like ``iam:DeleteRole*``.
-        When *catalog* is provided, also wildcards at verb level when the
-        catalog confirms that every matching action is already in the
-        statement (``iam:Delete*`` is safe if all Delete* actions are listed).
+        Trie-based recursive compression.  A wildcard is emitted for any
+        sub-group of actions sharing a prefix longer than their verb prefix.
+        When *catalog* is provided, wildcards are only emitted when the
+        catalog confirms no additional actions would be covered.
     aggressive
-        Wildcard at verb level (pre-LCP behaviour), e.g. ``iam:Delete*``.
+        Verb-level wildcard for each verb group, e.g. ``iam:Delete*``.
         Saves more bytes but may broaden policy scope.  *catalog* has no
         effect in aggressive mode.
     """
@@ -124,13 +145,10 @@ def _compress_service_actions(
 ) -> list[str]:
     """Compress action names within a single service.
 
-    conservative mode: wildcard only when LCP extends beyond the verb prefix
-                       AND (no catalog is present OR the catalog confirms the
-                       LCP wildcard matches no additional actions).  When the
-                       LCP wildcard is blocked by the catalog, falls back to a
-                       verb-level wildcard if the catalog confirms full
-                       verb-level coverage.
-    aggressive mode:   wildcard at verb level (``service:Verb*``).
+    conservative mode: trie-based recursive sub-group compression (see
+                       ``_compress_name_group``).
+    aggressive mode:   verb-level wildcard (``service:Verb*``) for each
+                       verb group when shorter than the expanded form.
     """
     if len(names) <= 1:
         return [f"{service}:{n}" for n in names]
@@ -144,43 +162,88 @@ def _compress_service_actions(
     result: list[str] = []
     for verb, group in sorted(by_prefix.items()):
         expanded = [f"{service}:{n}" for n in group]
-        if len(group) >= 2 and verb:
-            if mode == "aggressive":
-                # Verb-level wildcard regardless of sub-prefix commonality
-                wildcard = f"{service}:{verb}*"
-                expanded_len = sum(len(a) for a in expanded) + len(expanded) - 1
-                if len(wildcard) < expanded_len:
-                    result.append(wildcard)
-                    continue
-            else:
-                # conservative: require LCP beyond the verb
-                lcp = find_longest_common_prefix(group)
-                if len(lcp) > len(verb):
-                    wildcard = f"{service}:{lcp}*"
-                    expanded_len = sum(len(a) for a in expanded) + len(expanded) - 1
-                    if len(wildcard) < expanded_len:
-                        # Safety check: when the catalog is available, confirm
-                        # that every catalog action matching the LCP pattern is
-                        # already present in the statement.  Without a catalog
-                        # the LCP heuristic is trusted as-is.
-                        if catalog is None or catalog.covers(
-                            service, lcp, frozenset(names)
-                        ):
-                            result.append(wildcard)
-                            continue
-                        # Catalog signals the LCP wildcard would broaden scope;
-                        # fall through to the verb-level catalog check below.
-                # catalog fallback: verb-level wildcard is safe when the
-                # catalog confirms every matching action is already present
-                if catalog is not None and catalog.covers(service, verb, frozenset(names)):
-                    wildcard = f"{service}:{verb}*"
-                    expanded_len = sum(len(a) for a in expanded) + len(expanded) - 1
-                    if len(wildcard) < expanded_len:
-                        result.append(wildcard)
-                        continue
-        result.extend(expanded)
+        if len(group) >= 2 and verb and mode == "aggressive":
+            # Aggressive: emit verb-level wildcard when shorter.
+            wildcard = f"{service}:{verb}*"
+            if _wildcard_saves_bytes(wildcard, expanded):
+                result.append(wildcard)
+                continue
+        # Conservative (or aggressive group that didn't save bytes):
+        # recurse into the verb group using trie-based sub-group compression.
+        result.extend(_compress_name_group(service, group, verb, mode=mode, catalog=catalog))
 
     return result
+
+
+def _compress_name_group(
+    service: str,
+    names: list[str],
+    base_prefix: str,
+    *,
+    mode: str,
+    catalog: ActionCatalog | None,
+) -> list[str]:
+    """Recursively compress a group of action names sharing *base_prefix*.
+
+    At each level the algorithm:
+
+    1. Computes the longest common prefix (LCP) of *names*.
+    2. If LCP extends beyond *base_prefix*, attempts a ``service:LCP*``
+       wildcard (safety-checked via catalog when available).
+    3. If LCP equals *base_prefix* and a catalog is present, attempts a
+       ``service:base_prefix*`` wildcard confirmed by the catalog.
+    4. When no single wildcard covers the whole group, splits by the next
+       character after LCP and recurses into each sub-group independently.
+
+    The recursion terminates because each recursive call either has a
+    strictly longer *base_prefix* or fewer names.
+    """
+    if len(names) <= 1:
+        return [f"{service}:{n}" for n in names]
+
+    lcp = find_longest_common_prefix(names)
+    expanded = [f"{service}:{n}" for n in names]
+
+    # --- Try a wildcard at the LCP level if it extends beyond base_prefix ---
+    if len(lcp) > len(base_prefix):
+        wildcard = f"{service}:{lcp}*"
+        if _wildcard_saves_bytes(wildcard, expanded):
+            if catalog is None or catalog.covers(service, lcp, frozenset(names)):
+                return [wildcard]
+            # Catalog signals the LCP wildcard would broaden scope;
+            # fall through to sub-grouping.
+
+    # --- Catalog fallback: base_prefix-level wildcard ---
+    # Only attempted when names diverge immediately (lcp == base_prefix) so
+    # the LCP path above did not fire.  The catalog confirms full coverage.
+    if lcp == base_prefix and catalog is not None:
+        wildcard = f"{service}:{base_prefix}*"
+        if _wildcard_saves_bytes(wildcard, expanded):
+            if catalog.covers(service, base_prefix, frozenset(names)):
+                return [wildcard]
+
+    # --- Split by next character after LCP and recurse ---
+    split_at = len(lcp)
+    groups: dict[str, list[str]] = {}
+    for name in names:
+        key = name[split_at] if split_at < len(name) else ""
+        groups.setdefault(key, []).append(name)
+
+    result: list[str] = []
+    for _, group in sorted(groups.items()):
+        result.extend(_compress_name_group(service, group, lcp, mode=mode, catalog=catalog))
+    return result
+
+
+def _wildcard_saves_bytes(wildcard: str, expanded: list[str]) -> bool:
+    """Return True if *wildcard* produces fewer JSON bytes than *expanded*.
+
+    Uses JSON-accurate accounting: each string in an array costs
+    ``len + 2`` bytes (surrounding quotes), and n elements need n−1 commas.
+    """
+    wildcard_bytes = len(wildcard) + 2
+    expanded_bytes = sum(len(a) + 2 for a in expanded) + len(expanded) - 1
+    return wildcard_bytes < expanded_bytes
 
 
 def _extract_verb_prefix(action_name: str) -> str:

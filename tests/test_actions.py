@@ -22,8 +22,14 @@ class TestVerbPrefixExtraction:
 
 
 class TestActionCompression:
-    def test_no_compress_same_verb_only(self) -> None:
-        """Actions sharing only the verb with no further common prefix stay explicit."""
+    def test_trie_compresses_subgroup_within_verb_group(self) -> None:
+        """Actions that share a common prefix longer than the verb are now compressed
+        as a sub-group, even when the full verb group's LCP only equals the verb.
+
+        GetBucketPolicy and GetBucketAcl share 'GetBucket' (> verb 'Get'),
+        so they are compressed to s3:GetBucket*.  GetObject is in a different
+        trie branch and stays explicit.
+        """
         stmt = Statement(
             effect="Deny",
             action=["s3:GetObject", "s3:GetBucketPolicy", "s3:GetBucketAcl"],
@@ -31,9 +37,11 @@ class TestActionCompression:
         )
         result = compress_actions([stmt])
         actions = result[0].action_list
-        # LCP of GetObject/GetBucketPolicy/GetBucketAcl is 'Get' == verb -> no wildcard
+        assert "s3:GetBucket*" in actions
+        assert "s3:GetObject" in actions
         assert "s3:Get*" not in actions
-        assert set(actions) == {"s3:GetObject", "s3:GetBucketPolicy", "s3:GetBucketAcl"}
+        assert "s3:GetBucketPolicy" not in actions
+        assert "s3:GetBucketAcl" not in actions
 
     def test_compress_shared_sub_prefix(self) -> None:
         """Actions whose LCP exceeds the verb get a tight wildcard."""
@@ -134,6 +142,66 @@ class TestActionCompression:
         actions = result[0].action_list
         assert "s3:Get*" in actions
         assert "ec2:Describe*" in actions
+
+
+class TestTrieBasedCompression:
+    """Recursive sub-group compression: verb groups are split by trie structure."""
+
+    def test_subgroup_of_verb_group_gets_own_wildcard(self) -> None:
+        """When the full verb group's LCP equals the verb, sub-groups are
+        examined independently.  A sub-group with a longer shared prefix
+        gets a tighter wildcard while other branches stay explicit.
+        """
+        stmt = Statement(
+            effect="Deny",
+            action=[
+                "iam:CreatePolicy",
+                "iam:CreatePolicyVersion",
+                "iam:CreateRole",
+            ],
+            resource="*",
+        )
+        result = compress_actions([stmt])
+        actions = result[0].action_list
+        # CreatePolicy + CreatePolicyVersion share 'CreatePolicy' > 'Create'
+        assert "iam:CreatePolicy*" in actions
+        # CreateRole stays explicit (no sibling to form a sub-group)
+        assert "iam:CreateRole" in actions
+        # Verb-level wildcard must NOT be emitted in conservative mode
+        assert "iam:Create*" not in actions
+
+    def test_trie_three_level_nesting(self) -> None:
+        """Compression works correctly when names nest three levels deep."""
+        stmt = Statement(
+            effect="Deny",
+            action=[
+                "s3:DeleteObject",
+                "s3:DeleteObjectAcl",
+                "s3:DeleteObjectVersion",
+                "s3:DeleteBucket",
+            ],
+            resource="*",
+        )
+        result = compress_actions([stmt])
+        actions = result[0].action_list
+        # DeleteObject + DeleteObjectAcl + DeleteObjectVersion share 'DeleteObject'
+        assert "s3:DeleteObject*" in actions
+        # DeleteBucket stays explicit
+        assert "s3:DeleteBucket" in actions
+        assert "s3:Delete*" not in actions
+
+    def test_trie_does_not_compress_truly_divergent_groups(self) -> None:
+        """Actions whose sub-branches are all singletons remain explicit."""
+        stmt = Statement(
+            effect="Deny",
+            action=["guardduty:DeleteDetector", "guardduty:DeleteMembers"],
+            resource="*",
+        )
+        result = compress_actions([stmt])
+        actions = result[0].action_list
+        # D-branch → DeleteDetector (single), M-branch → DeleteMembers (single)
+        assert "guardduty:Delete*" not in actions
+        assert set(actions) == {"guardduty:DeleteDetector", "guardduty:DeleteMembers"}
 
 
 class TestCatalogAwareCompression:
