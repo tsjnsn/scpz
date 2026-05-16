@@ -34,14 +34,17 @@ def merge_statements(
 ) -> list[Statement]:
     """Merge compatible statements.
 
-    Statements are mergeable when they share:
-      - Same Effect
-      - Same Condition (semantically equal)
-      - Same Resource (or both '*')
-      - Both use Action (not NotAction), OR both use NotAction
+    Two statements are merged when they share Effect and Condition and one
+    of the following is true:
 
-    When merged, their action lists are unioned and Sids are handled
-    according to *sid_merge_mode*.
+    - **Same Resource, different Actions** → union the Action lists.
+    - **Same Action, different Resources** → union the Resource lists.
+
+    When both Action *and* Resource differ, the statements are kept
+    separate: merging them would create a cross-product that broadens
+    the effective policy beyond the original intent.
+
+    Sids are handled according to *sid_merge_mode*.
     """
     if len(statements) <= 1:
         return statements
@@ -96,10 +99,6 @@ def _try_merge(
     if not conditions_equal(a.condition, b.condition):
         return None
 
-    # Must have same Resource
-    if _normalise_field(a.resource) != _normalise_field(b.resource):
-        return None
-
     new_sid = _merge_sids(
         a.sid,
         b.sid,
@@ -108,18 +107,36 @@ def _try_merge(
         max_length=sid_join_max_length,
     )
 
-    # Merge action lists
-    if a_uses_not:
-        combined_actions = _union_lists(a.not_action_list, b.not_action_list)
-        new_not_action = combined_actions if len(combined_actions) > 1 else combined_actions[0]
-        return a.model_copy(update={"not_action": new_not_action, "sid": new_sid})
-    combined_actions = _union_lists(a.action_list, b.action_list)
-    return a.model_copy(
-        update={
-            "action": combined_actions if len(combined_actions) > 1 else combined_actions[0],
-            "sid": new_sid,
-        }
-    )
+    same_resource = _normalise_field(a.resource) == _normalise_field(b.resource)
+    # Compare the relevant action field (Action or NotAction) as a frozenset.
+    a_action_set = frozenset(a.not_action_list if a_uses_not else a.action_list)
+    b_action_set = frozenset(b.not_action_list if b_uses_not else b.action_list)
+    same_action = a_action_set == b_action_set
+
+    if same_resource:
+        # Union action lists (original behaviour).
+        if a_uses_not:
+            combined = _union_lists(a.not_action_list, b.not_action_list)
+            new_not_action = combined if len(combined) > 1 else combined[0]
+            return a.model_copy(update={"not_action": new_not_action, "sid": new_sid})
+        combined = _union_lists(a.action_list, b.action_list)
+        return a.model_copy(
+            update={
+                "action": combined if len(combined) > 1 else combined[0],
+                "sid": new_sid,
+            }
+        )
+
+    if same_action:
+        # Union resource lists (symmetric case).
+        combined_resources = _union_lists(a.resource_list, b.resource_list)
+        new_resource: list[str] | str = (
+            combined_resources if len(combined_resources) > 1 else combined_resources[0]
+        )
+        return a.model_copy(update={"resource": new_resource, "sid": new_sid})
+
+    # Both Action and Resource differ — merging would create a cross-product.
+    return None
 
 
 def _normalise_field(val: list[str] | str) -> frozenset[str]:
