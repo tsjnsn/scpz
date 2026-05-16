@@ -1,0 +1,108 @@
+# Kitchen-sink reference configuration for scpeasy.
+# Every supported option is shown with its default value and all valid choices.
+# Planned (not yet implemented) options are shown commented out.
+#
+# To validate your own scpeasy.yaml against the JSON Schema:
+#   scpeasy schema | python -m jsonschema - --instance your-scpeasy.yaml
+#
+# To regenerate the committed schema after model changes:
+#   scpeasy schema -o schema/OptimizerConfig.json
+
+apiVersion: scpeasy.io/v1alpha1
+kind: OptimizerConfig
+metadata:
+  name: examples
+  # labels and annotations are ignored but allowed for team workflows,
+  # e.g. to tag configs by environment or owning team.
+  # labels:
+  #   env: production
+  #   team: security
+
+spec:
+
+  # ── Action catalog (planned) ────────────────────────────────────────
+  # A catalog of known AWS actions enables catalog-aware wildcard compression.
+  # When present, actionCompress can safely emit broad wildcards like
+  # iam:Delete* only when every known iam:Delete... action is already listed
+  # in the statement — guaranteeing no unintended actions are added.
+  # Without a catalog, the conservative LCP heuristic is the only safety net.
+  #
+  # catalog:
+  #   source: bundled       # bundled | file | none
+  #                         #   bundled - catalog shipped with scpeasy
+  #                         #   file    - load from a local JSON file
+  #                         #   none    - disable catalog; fall back to LCP
+  #   path: null            # path to catalog file; only used when source: file
+  #                         # e.g. path: ./aws-actions-2025.json
+
+  # ── Optimizer passes ───────────────────────────────────────────────
+  # Each pass has an `enabled` key. Set `enabled: false` to disable a pass
+  # while keeping its other args in place. Omitting a pass key entirely uses
+  # that pass's built-in defaults (enabled: true for most; enabled: false for
+  # redundancyEliminate, which is opt-in).
+  # Passes run in the fixed order listed below regardless of key order here.
+  optimizer:
+
+    # Combines statements that share the same Effect, Condition, and Resource
+    # by unioning their Action lists. Reduces statement count — the most
+    # impactful optimization for policies near the 5-statement limit.
+    statementMerge:
+      enabled: true
+      sidOnMerge: first       # drop | first | join | joinTruncate
+                              #   drop         - omit Sid (fewest bytes)
+                              #   first        - keep first statement's Sid
+                              #   join         - concatenate Sids with separator
+                              #   joinTruncate - join then truncate to maxLength
+      sidJoinSeparator: "+"
+      sidJoinMaxLength: 64
+
+    # Replaces groups of actions sharing a common sub-prefix with a wildcard.
+    # conservative mode requires the LCP to extend beyond the verb prefix
+    # (e.g. iam:DeleteRole* not iam:Delete*) to avoid broadening scope.
+    # aggressive mode wildcards at verb level — more savings, broader scope.
+    actionCompress:
+      enabled: true
+      mode: conservative      # conservative | aggressive
+
+    # Deduplicates condition values and merges equivalent condition blocks
+    # within each statement.
+    conditionMerge:
+      enabled: true
+
+    # Collapses ARN lists into wildcard patterns when resource names share a
+    # common prefix (e.g. role/prod-app-1 + role/prod-app-2 -> role/prod-app-*).
+    # Unrelated names (no shared prefix) are never collapsed.
+    resourceOptimize:
+      enabled: true
+
+    # Removes statements that are wholly subsumed by another statement in the
+    # same policy (same Effect + Condition, with actions that are a strict
+    # subset of another statement's actions). Wildcard-aware: iam:Delete*
+    # subsumes iam:DeleteRole without a catalog.
+    # Default is enabled: false (opt-in). Set to true to activate.
+    redundancyEliminate:
+      enabled: true
+
+    # Runs last. Splits the policy into multiple SCP documents when it still
+    # exceeds AWS limits after all other passes. Set enabled: false to error
+    # instead (equivalent to --no-split).
+    split:
+      enabled: true
+      strategy: auto          # auto | never
+
+  # ── Validation (planned) ───────────────────────────────────────────
+  # Tunes the severity of individual validation checks. Each rule accepts:
+  #   error  - block optimization and exit non-zero
+  #   warn   - print a warning but continue
+  #   ignore - suppress the check entirely
+  #
+  # validation:
+  #   onWildcardAction: warn    # fires when Action contains a wildcard (*/?)
+  #   onBroadResource: warn     # fires when Resource is * with no Condition
+  #   onMissingSid: ignore      # fires when a statement has no Sid
+  #   onUnknownService: warn    # fires on unrecognised service prefixes
+
+  # ── Output ─────────────────────────────────────────────────────────
+  output:
+    backupSuffix: ".bak"      # suffix appended when writing in-place;
+                              # set to "" to disable backups entirely

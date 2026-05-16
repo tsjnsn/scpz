@@ -1,0 +1,214 @@
+{
+  "$defs": {
+    "ActionCompressArgs": {
+      "additionalProperties": false,
+      "description": "Args for the actionCompress pass.",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "mode": {
+          "default": "conservative",
+          "enum": [
+            "conservative",
+            "aggressive"
+          ],
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "title": "ActionCompressArgs",
+      "type": "object"
+    },
+    "ConditionMergeArgs": {
+      "additionalProperties": false,
+      "description": "Args for the conditionMerge pass.",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        }
+      },
+      "title": "ConditionMergeArgs",
+      "type": "object"
+    },
+    "ConfigMetadata": {
+      "additionalProperties": true,
+      "description": "Standard Kubernetes-style metadata block.",
+      "properties": {
+        "name": {
+          "default": "default",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "title": "ConfigMetadata",
+      "type": "object"
+    },
+    "ConfigSpec": {
+      "additionalProperties": false,
+      "description": "The full spec block.",
+      "properties": {
+        "optimizer": {
+          "$ref": "#/$defs/PassesConfig"
+        },
+        "output": {
+          "$ref": "#/$defs/OutputConfig"
+        }
+      },
+      "title": "ConfigSpec",
+      "type": "object"
+    },
+    "OutputConfig": {
+      "additionalProperties": false,
+      "description": "spec.output \u2014 controls how files are written.",
+      "properties": {
+        "backupSuffix": {
+          "default": ".bak",
+          "title": "Backupsuffix",
+          "type": "string"
+        }
+      },
+      "title": "OutputConfig",
+      "type": "object"
+    },
+    "PassesConfig": {
+      "additionalProperties": false,
+      "description": "Map of optimizer passes.\n\nEach pass field always has an ``enabled`` key.  Set ``enabled: false`` to\ndisable a pass while keeping its other args in place.  Omitting a pass key\nentirely uses that pass's defaults (which includes its default ``enabled``\nvalue \u2014 ``true`` for most passes, ``false`` for ``redundancyEliminate``).",
+      "properties": {
+        "statementMerge": {
+          "$ref": "#/$defs/StatementMergeArgs"
+        },
+        "actionCompress": {
+          "$ref": "#/$defs/ActionCompressArgs"
+        },
+        "conditionMerge": {
+          "$ref": "#/$defs/ConditionMergeArgs"
+        },
+        "resourceOptimize": {
+          "$ref": "#/$defs/ResourceOptimizeArgs"
+        },
+        "redundancyEliminate": {
+          "$ref": "#/$defs/RedundancyEliminateArgs"
+        },
+        "split": {
+          "$ref": "#/$defs/SplitArgs"
+        }
+      },
+      "title": "PassesConfig",
+      "type": "object"
+    },
+    "RedundancyEliminateArgs": {
+      "additionalProperties": false,
+      "description": "Args for the redundancyEliminate pass.\n\nDefaults to ``enabled: false`` \u2014 opt-in because it is more aggressive\nthan the other passes and may require user review of the results.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        }
+      },
+      "title": "RedundancyEliminateArgs",
+      "type": "object"
+    },
+    "ResourceOptimizeArgs": {
+      "additionalProperties": false,
+      "description": "Args for the resourceOptimize pass.",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        }
+      },
+      "title": "ResourceOptimizeArgs",
+      "type": "object"
+    },
+    "SplitArgs": {
+      "additionalProperties": false,
+      "description": "Args for the split pass.",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "strategy": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "never"
+          ],
+          "title": "Strategy",
+          "type": "string"
+        }
+      },
+      "title": "SplitArgs",
+      "type": "object"
+    },
+    "StatementMergeArgs": {
+      "additionalProperties": false,
+      "description": "Args for the statementMerge pass.",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "sidOnMerge": {
+          "default": "first",
+          "enum": [
+            "drop",
+            "first",
+            "join",
+            "joinTruncate"
+          ],
+          "title": "Sidonmerge",
+          "type": "string"
+        },
+        "sidJoinSeparator": {
+          "default": "+",
+          "title": "Sidjoinseparator",
+          "type": "string"
+        },
+        "sidJoinMaxLength": {
+          "default": 64,
+          "minimum": 1,
+          "title": "Sidjoinmaxlength",
+          "type": "integer"
+        }
+      },
+      "title": "StatementMergeArgs",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Root config object, following the Kubernetes object model.",
+  "properties": {
+    "apiVersion": {
+      "title": "Apiversion",
+      "type": "string"
+    },
+    "kind": {
+      "title": "Kind",
+      "type": "string"
+    },
+    "metadata": {
+      "$ref": "#/$defs/ConfigMetadata"
+    },
+    "spec": {
+      "$ref": "#/$defs/ConfigSpec"
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind"
+  ],
+  "title": "OptimizerConfig",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scpeasy.io/schemas/scpeasy.io/v1alpha1/OptimizerConfig.json"
+}

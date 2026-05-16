@@ -1,0 +1,87 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyS3PublicAccess",
+      "Effect": "Deny",
+      "Action": "s3:PutBucketPublicAccessBlock",
+      "Resource": "*",
+      "Condition": {
+        "StringNotEqualsIfExists": {
+          "aws:PrincipalArn": "arn:aws:iam::123456789012:role/SecurityAdmin"
+        }
+      }
+    },
+    {
+      "Sid": "DenyS3PolicyChanges",
+      "Effect": "Deny",
+      "Action": "s3:PutBucketPolicy",
+      "Resource": "*",
+      "Condition": {
+        "StringNotEqualsIfExists": {
+          "aws:PrincipalArn": "arn:aws:iam::123456789012:role/SecurityAdmin"
+        }
+      }
+    },
+    {
+      "Sid": "DenyS3AclChanges",
+      "Effect": "Deny",
+      "Action": "s3:PutBucketAcl",
+      "Resource": "*",
+      "Condition": {
+        "StringNotEqualsIfExists": {
+          "aws:PrincipalArn": "arn:aws:iam::123456789012:role/SecurityAdmin"
+        }
+      }
+    },
+    {
+      "Sid": "DenyS3EncryptionChanges",
+      "Effect": "Deny",
+      "Action": "s3:PutEncryptionConfiguration",
+      "Resource": "*",
+      "Condition": {
+        "StringNotEqualsIfExists": {
+          "aws:PrincipalArn": "arn:aws:iam::123456789012:role/SecurityAdmin"
+        }
+      }
+    },
+    {
+      "Sid": "DenyS3VersioningChanges",
+      "Effect": "Deny",
+      "Action": "s3:PutBucketVersioning",
+      "Resource": "*",
+      "Condition": {
+        "StringNotEqualsIfExists": {
+          "aws:PrincipalArn": "arn:aws:iam::123456789012:role/SecurityAdmin"
+        }
+      }
+    },
+    {
+      "Sid": "DenyS3LoggingChanges",
+      "Effect": "Deny",
+      "Action": "s3:PutBucketLogging",
+      "Resource": "*",
+      "Condition": {
+        "StringNotEqualsIfExists": {
+          "aws:PrincipalArn": "arn:aws:iam::123456789012:role/SecurityAdmin"
+        }
+      }
+    },
+    {
+      "Sid": "DenyLeaveOrg",
+      "Effect": "Deny",
+      "Action": "organizations:LeaveOrganization",
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyCloudTrailStop",
+      "Effect": "Deny",
+      "Action": [
+        "cloudtrail:StopLogging",
+        "cloudtrail:DeleteTrail",
+        "cloudtrail:PutEventSelectors"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
