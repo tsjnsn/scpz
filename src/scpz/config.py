@@ -101,6 +101,21 @@ class SplitArgs(BaseModel):
     strategy: Literal["auto", "never"] = "auto"
 
 
+class FixpointArgs(BaseModel):
+    """Args for the fixpoint loop.
+
+    When enabled, the optimizer re-runs all passes in sequence until the
+    minified document stops changing or *maxRounds* is reached.  This lets
+    later passes (e.g. ``conditionMerge``) unlock earlier ones
+    (e.g. ``statementMerge``) on subsequent rounds.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    maxRounds: int = Field(default=5, ge=1)
+
+
 # ── Passes map ────────────────────────────────────────────────────────
 
 
@@ -121,6 +136,7 @@ class PassesConfig(BaseModel):
     resourceOptimize: ResourceOptimizeArgs = Field(default_factory=ResourceOptimizeArgs)
     redundancyEliminate: RedundancyEliminateArgs = Field(default_factory=RedundancyEliminateArgs)
     split: SplitArgs = Field(default_factory=SplitArgs)
+    fixpoint: FixpointArgs = Field(default_factory=FixpointArgs)
 
     @model_validator(mode="before")
     @classmethod
@@ -140,6 +156,7 @@ class PassesConfig(BaseModel):
             "resourceOptimize",
             "redundancyEliminate",
             "split",
+            "fixpoint",
         ):
             if field_name in values and values[field_name] is None:
                 values[field_name] = {"enabled": False}

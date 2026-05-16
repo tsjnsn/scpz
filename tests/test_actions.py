@@ -229,3 +229,148 @@ class TestCatalogAwareCompression:
         # LCP = 'DeleteRole' > verb 'Delete' → iam:DeleteRole* not iam:Delete*
         assert "iam:DeleteRole*" in actions
         assert "iam:Delete*" not in actions
+
+    def test_lcp_wildcard_blocked_when_catalog_has_additional_matching_action(self) -> None:
+        """LCP > verb but catalog contains an action matching the LCP wildcard
+        that is NOT in the statement — the wildcard must be suppressed."""
+        catalog = self._catalog_with(
+            "s3",
+            ["DeleteObject", "DeleteObjects", "DeleteObjectTagging"],
+        )
+        stmt = Statement(
+            effect="Deny",
+            action=["s3:DeleteObject", "s3:DeleteObjects"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="conservative", catalog=catalog)
+        actions = result[0].action_list
+        # s3:DeleteObject* would also cover DeleteObjectTagging (not in stmt)
+        assert "s3:DeleteObject*" not in actions
+        assert set(actions) == {"s3:DeleteObject", "s3:DeleteObjects"}
+
+    def test_lcp_wildcard_allowed_when_catalog_confirms_full_lcp_coverage(self) -> None:
+        """LCP > verb and catalog contains no additional actions matching the
+        LCP wildcard — the tight wildcard is safe to emit."""
+        catalog = self._catalog_with(
+            "s3",
+            ["DeleteObject", "DeleteObjects", "DeleteBucket"],
+        )
+        stmt = Statement(
+            effect="Deny",
+            action=["s3:DeleteObject", "s3:DeleteObjects"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="conservative", catalog=catalog)
+        actions = result[0].action_list
+        # Only DeleteObject and DeleteObjects start with 'DeleteObject' in
+        # the catalog — both are present in the statement, so s3:DeleteObject*
+        # is safe.
+        assert "s3:DeleteObject*" in actions
+
+    def test_lcp_wildcard_without_catalog_still_emits(self) -> None:
+        """Without a catalog the LCP heuristic is trusted as-is; the tight
+        wildcard is emitted even though we cannot verify full coverage."""
+        stmt = Statement(
+            effect="Deny",
+            action=["s3:DeleteObject", "s3:DeleteObjects"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="conservative", catalog=None)
+        actions = result[0].action_list
+        assert "s3:DeleteObject*" in actions
+
+
+class TestIntraStatementSubsumption:
+    """Explicit actions covered by a wildcard in the same statement are removed."""
+
+    def test_global_wildcard_subsumes_explicit_action(self) -> None:
+        """'*' subsumes any explicit action in the same statement."""
+        stmt = Statement(
+            effect="Deny",
+            action=["*", "iam:GetRole", "s3:GetObject"],
+            resource="*",
+        )
+        result = compress_actions([stmt])
+        assert result[0].action == "*"
+
+    def test_global_wildcard_subsumes_service_wildcard(self) -> None:
+        """'*' subsumes service-level wildcards like 's3:Get*'."""
+        stmt = Statement(
+            effect="Deny",
+            action=["*", "s3:Get*", "iam:CreateRole"],
+            resource="*",
+        )
+        result = compress_actions([stmt])
+        assert result[0].action == "*"
+
+    def test_service_wildcard_subsumes_explicit_action(self) -> None:
+        """'s3:Get*' subsumes 's3:GetObject' and other Get-prefixed actions."""
+        stmt = Statement(
+            effect="Deny",
+            action=["s3:Get*", "s3:GetObject", "s3:GetBucketPolicy"],
+            resource="*",
+        )
+        result = compress_actions([stmt])
+        assert result[0].action == "s3:Get*"
+
+    def test_broader_wildcard_subsumes_tighter_wildcard(self) -> None:
+        """'s3:Get*' subsumes the tighter 's3:GetObject*'."""
+        stmt = Statement(
+            effect="Deny",
+            action=["s3:Get*", "s3:GetObject*"],
+            resource="*",
+        )
+        result = compress_actions([stmt])
+        assert result[0].action == "s3:Get*"
+
+    def test_cross_service_wildcard_not_subsumed(self) -> None:
+        """'s3:Get*' must not subsume 'iam:GetRole' from a different service."""
+        stmt = Statement(
+            effect="Deny",
+            action=["s3:Get*", "iam:GetRole"],
+            resource="*",
+        )
+        result = compress_actions([stmt])
+        actions = result[0].action_list
+        assert "s3:Get*" in actions
+        assert "iam:GetRole" in actions
+
+    def test_no_wildcards_no_subsumption(self) -> None:
+        """With no wildcards present, all explicit actions are kept unchanged."""
+        stmt = Statement(
+            effect="Deny",
+            action=["iam:GetRole", "iam:CreateRole"],
+            resource="*",
+        )
+        result = compress_actions([stmt])
+        actions = result[0].action_list
+        assert "iam:GetRole" in actions
+        assert "iam:CreateRole" in actions
+
+    def test_multiple_wildcards_each_subsume_own_actions(self) -> None:
+        """Multiple wildcards each subsume their own matching explicit actions."""
+        stmt = Statement(
+            effect="Deny",
+            action=[
+                "s3:Get*",
+                "s3:Put*",
+                "s3:GetObject",
+                "s3:PutObject",
+                "ec2:RunInstances",
+            ],
+            resource="*",
+        )
+        result = compress_actions([stmt])
+        actions = result[0].action_list
+        assert "s3:Get*" in actions
+        assert "s3:Put*" in actions
+        assert "s3:GetObject" not in actions
+        assert "s3:PutObject" not in actions
+        assert "ec2:RunInstances" in actions  # not covered by any wildcard
+
+    def test_not_action_not_subsumed(self) -> None:
+        """compress_actions skips NotAction statements entirely."""
+        original: list[str] = ["iam:GetRole", "iam:CreateRole"]
+        stmt = Statement(effect="Deny", not_action=original, resource="*")
+        result = compress_actions([stmt])
+        assert result[0].not_action == original

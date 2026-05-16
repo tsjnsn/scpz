@@ -1,6 +1,8 @@
 """Optimization pipeline orchestrator.
 
 Runs all optimisation passes in order and produces the final optimised SCP.
+When the fixpoint loop is enabled (default), the full pass sequence repeats
+until the minified document stops shrinking or ``maxRounds`` is reached.
 """
 
 from __future__ import annotations
@@ -9,11 +11,12 @@ import json
 from dataclasses import dataclass, field
 
 from scpz.catalog import ActionCatalog
-from scpz.config import OptimizerConfig
+from scpz.config import OptimizerConfig, PassesConfig
 from scpz.constants import MAX_SCP_SIZE_BYTES, MAX_STATEMENTS_PER_SCP
 from scpz.models import ScpDocument, Statement
 from scpz.optimizations.actions import compress_actions
 from scpz.optimizations.conditions import merge_conditions
+from scpz.optimizations.minify import canonicalize_statement
 from scpz.optimizations.redundancy import eliminate_redundancy
 from scpz.optimizations.resources import optimize_resources
 from scpz.optimizations.statements import SidMergeMode, merge_statements
@@ -75,16 +78,62 @@ def optimize(
     *,
     config: OptimizerConfig | None = None,
 ) -> OptimizationResult:
-    """Run the full optimization pipeline on an SCP document."""
+    """Run the full optimization pipeline on an SCP document.
+
+    When ``config.spec.optimizer.fixpoint.enabled`` is True (default), the
+    full pass sequence repeats until the serialised statements stop changing
+    or ``maxRounds`` is exhausted.  Each unique pass name is recorded at most
+    once in ``passes_applied`` regardless of the number of rounds.
+    """
     if config is None:
         config = OptimizerConfig.default()
 
     passes_cfg = config.spec.optimizer
-    passes_applied: list[str] = []
+    catalog = ActionCatalog.load(config.spec.catalog)
     stmts = list(doc.statement)
 
-    # Load action catalog (used by actionCompress in conservative mode)
-    catalog = ActionCatalog.load(config.spec.catalog)
+    # Track which passes ran, deduplicated and in first-seen order.
+    passes_seen: set[str] = set()
+    passes_applied: list[str] = []
+
+    max_rounds = passes_cfg.fixpoint.maxRounds if passes_cfg.fixpoint.enabled else 1
+
+    for _ in range(max_rounds):
+        prev = _serialise_stmts(stmts)
+        stmts, round_applied = _run_passes_once(stmts, passes_cfg, catalog)
+        for p in round_applied:
+            if p not in passes_seen:
+                passes_seen.add(p)
+                passes_applied.append(p)
+        if _serialise_stmts(stmts) == prev:
+            break  # converged
+
+    # Always apply canonical minification as a final cleanup step.
+    stmts = [canonicalize_statement(s) for s in stmts]
+
+    optimized = ScpDocument(version=doc.version, statement=stmts)
+
+    if not passes_applied:
+        passes_applied.append("none (already optimal)")
+
+    return OptimizationResult(
+        original=doc,
+        optimized=optimized,
+        passes_applied=passes_applied,
+    )
+
+
+def _run_passes_once(
+    stmts: list[Statement],
+    passes_cfg: PassesConfig,
+    catalog: ActionCatalog,
+) -> tuple[list[Statement], list[str]]:
+    """Execute every enabled pass once in order.
+
+    Returns the updated statement list and the names of passes that produced
+    a change in this round.
+    """
+    applied: list[str] = []
 
     # 1. Statement merging
     if passes_cfg.statementMerge.enabled:
@@ -97,7 +146,7 @@ def optimize(
             sid_join_max_length=sm_args.sidJoinMaxLength,
         )
         if len(stmts) < before:
-            passes_applied.append("statement-merge")
+            applied.append("statement-merge")
 
     # 2. Action wildcard compression
     if passes_cfg.actionCompress.enabled:
@@ -108,43 +157,30 @@ def optimize(
             catalog=catalog,
         )
         if _serialise_stmts(stmts) != prev:
-            passes_applied.append("action-compress")
+            applied.append("action-compress")
 
     # 3. Condition merging
     if passes_cfg.conditionMerge.enabled:
         prev = _serialise_stmts(stmts)
         stmts = merge_conditions(stmts)
         if _serialise_stmts(stmts) != prev:
-            passes_applied.append("condition-merge")
+            applied.append("condition-merge")
 
     # 4. Resource ARN optimization
     if passes_cfg.resourceOptimize.enabled:
         prev = _serialise_stmts(stmts)
         stmts = optimize_resources(stmts)
         if _serialise_stmts(stmts) != prev:
-            passes_applied.append("resource-optimize")
+            applied.append("resource-optimize")
 
     # 5. Redundancy elimination
     if passes_cfg.redundancyEliminate.enabled:
         before = len(stmts)
         stmts = eliminate_redundancy(stmts)
         if len(stmts) < before:
-            passes_applied.append("redundancy-eliminate")
+            applied.append("redundancy-eliminate")
 
-    # Build optimised document
-    optimized = ScpDocument(
-        version=doc.version,
-        statement=stmts,
-    )
-
-    if not passes_applied:
-        passes_applied.append("none (already optimal)")
-
-    return OptimizationResult(
-        original=doc,
-        optimized=optimized,
-        passes_applied=passes_applied,
-    )
+    return stmts, applied
 
 
 def _serialise_stmts(stmts: list[Statement]) -> str:

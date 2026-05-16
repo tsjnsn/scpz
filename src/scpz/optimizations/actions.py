@@ -8,6 +8,16 @@ extends *beyond* the verb prefix.  This keeps wildcards semantically tight:
   iam:UpdateRole + iam:UpdateAssumeRolePolicy -> kept explicit (LCP == verb)
   logs:DeleteLogGroup + logs:DeleteLogStream  -> logs:DeleteLog* (LCP > verb)
   guardduty:DeleteDetector + guardduty:DeleteMembers -> kept explicit
+
+Catalog safety in conservative mode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a catalog is provided, it is used to guard *both* wildcard levels:
+
+- LCP wildcard (``svc:LCP*``): emitted only when the catalog confirms that
+  no action starting with LCP exists beyond those already in the statement.
+  Without a catalog the LCP heuristic is trusted as-is.
+- Verb wildcard (``svc:Verb*``): emitted only when the catalog confirms full
+  verb-level coverage (every ``Verb*`` catalog action is in the statement).
 """
 
 from __future__ import annotations
@@ -101,6 +111,7 @@ def _compress_action_list(
     for svc, names in sorted(by_service.items()):
         result.extend(_compress_service_actions(svc, names, mode=mode, catalog=catalog))
 
+    result = _remove_subsumed_actions(result)
     return sorted(set(result))
 
 
@@ -113,8 +124,12 @@ def _compress_service_actions(
 ) -> list[str]:
     """Compress action names within a single service.
 
-    conservative mode: wildcard only when LCP extends beyond the verb prefix,
-                       OR when the catalog confirms full verb-level coverage.
+    conservative mode: wildcard only when LCP extends beyond the verb prefix
+                       AND (no catalog is present OR the catalog confirms the
+                       LCP wildcard matches no additional actions).  When the
+                       LCP wildcard is blocked by the catalog, falls back to a
+                       verb-level wildcard if the catalog confirms full
+                       verb-level coverage.
     aggressive mode:   wildcard at verb level (``service:Verb*``).
     """
     if len(names) <= 1:
@@ -144,8 +159,17 @@ def _compress_service_actions(
                     wildcard = f"{service}:{lcp}*"
                     expanded_len = sum(len(a) for a in expanded) + len(expanded) - 1
                     if len(wildcard) < expanded_len:
-                        result.append(wildcard)
-                        continue
+                        # Safety check: when the catalog is available, confirm
+                        # that every catalog action matching the LCP pattern is
+                        # already present in the statement.  Without a catalog
+                        # the LCP heuristic is trusted as-is.
+                        if catalog is None or catalog.covers(
+                            service, lcp, frozenset(names)
+                        ):
+                            result.append(wildcard)
+                            continue
+                        # Catalog signals the LCP wildcard would broaden scope;
+                        # fall through to the verb-level catalog check below.
                 # catalog fallback: verb-level wildcard is safe when the
                 # catalog confirms every matching action is already present
                 if catalog is not None and catalog.covers(service, verb, frozenset(names)):
@@ -178,3 +202,50 @@ def find_longest_common_prefix(strings: list[str]) -> str:
     if not strings:
         return ""
     return os.path.commonprefix(strings)
+
+
+def _covers_action(covering: str, covered: str) -> bool:
+    """Return True if *covering* covers *covered*.
+
+    Exact string equality returns False so that an action is not considered
+    to cover itself — callers that need to handle self-coverage should guard
+    with an index check.
+
+    ``*``            covers everything.
+    ``svc:Verb*``    covers ``svc:VerbFoo``, ``svc:VerbFoo*``, etc.
+    ``svc:VerbFoo``  does not cover ``svc:VerbFoo`` (exact match excluded).
+    """
+    if covering == covered:
+        return False
+    if covering == "*":
+        return True
+    if covering.endswith("*"):
+        return covered.startswith(covering[:-1])
+    return False
+
+
+def _remove_subsumed_actions(actions: list[str]) -> list[str]:
+    """Remove actions (including tighter wildcards) that are already covered
+    by a broader action or wildcard in the same list.
+
+    Examples::
+
+        ["*", "iam:GetRole"]            -> ["*"]
+        ["s3:Get*", "s3:GetObject"]     -> ["s3:Get*"]
+        ["s3:Get*", "s3:GetObject*"]    -> ["s3:Get*"]
+        ["s3:Get*", "iam:GetRole"]      -> ["s3:Get*", "iam:GetRole"]  (unchanged)
+
+    Runs in O(n²) over the action list — acceptable given the small size of
+    SCP action lists in practice.
+    """
+    if len(actions) <= 1:
+        return actions
+    # Fast path: no wildcards present, nothing can be subsumed.
+    if not any("*" in a or "?" in a for a in actions):
+        return actions
+
+    return [
+        action
+        for i, action in enumerate(actions)
+        if not any(_covers_action(other, action) for j, other in enumerate(actions) if i != j)
+    ]
