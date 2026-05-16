@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import textwrap
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -16,6 +16,9 @@ from scpz.config import (
 )
 from scpz.models import Statement
 from scpz.optimizations.statements import SidMergeMode, merge_statements
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -143,7 +146,7 @@ class TestConfigValidation:
                 unknownPass: {{}}
             """,
         )
-        with pytest.raises(ValueError, match="Extra inputs are not permitted|unknownPass"):
+        with pytest.raises(ValueError, match=r"Extra inputs are not permitted|unknownPass"):
             OptimizerConfig.load(tmp_path / "p.json")
 
     def test_unknown_arg_field_raises(self, tmp_path: Path) -> None:
@@ -158,7 +161,7 @@ class TestConfigValidation:
                   typoArg: yes
             """,
         )
-        with pytest.raises(ValueError, match="Extra inputs are not permitted|typoArg"):
+        with pytest.raises(ValueError, match=r"Extra inputs are not permitted|typoArg"):
             OptimizerConfig.load(tmp_path / "p.json")
 
     def test_invalid_sid_on_merge_value_raises(self, tmp_path: Path) -> None:
@@ -173,7 +176,7 @@ class TestConfigValidation:
                   sidOnMerge: concat
             """,
         )
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"sidOnMerge"):
             OptimizerConfig.load(tmp_path / "p.json")
 
     def test_empty_dict_enables_pass_with_defaults(self, tmp_path: Path) -> None:

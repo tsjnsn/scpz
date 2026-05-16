@@ -7,7 +7,7 @@ for staying within the 5-statement limit.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from scpz.optimizations.conditions import conditions_equal
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from scpz.models import Statement
 
 
-class SidMergeMode(str, Enum):
+class SidMergeMode(StrEnum):
     """Controls what happens to Sid fields when statements are merged."""
 
     DROP = "drop"  # omit Sid entirely — fewest bytes

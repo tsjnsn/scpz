@@ -49,6 +49,7 @@ dev = [
     "ruff>=0.11",
     "mypy>=1.15",
     "pre-commit>=4",
+    "types-PyYAML>=6",
 ]
 
 [tool.pytest.ini_options]
@@ -86,6 +87,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN", "T20"]
 "src/scpz/cli.py" = ["B008"]  # typer uses function calls as defaults
+"src/scpz/config.py" = ["N815"]  # camelCase field names match the YAML config schema
 "scripts/**" = ["T20", "ANN"]   # standalone scripts may use print()
 
 [tool.ruff.lint.isort]

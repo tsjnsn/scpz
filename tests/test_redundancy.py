@@ -7,7 +7,6 @@ import pytest
 from scpz.models import Statement
 from scpz.optimizations.redundancy import _covers, eliminate_redundancy
 
-
 # ── Helpers ───────────────────────────────────────────────────────────
 
 
