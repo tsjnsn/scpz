@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-05-16
+
+### Changed
+- Refactored `actions.py` internals: extracted `_bare_prefix` helper,
+  improved `_try_shorten_across_verbs` with incremental LCP narrowing,
+  hoisted `has_catalog` guard, fixed type narrowing for mypy/pyright strict mode.
+- Fixed inaccurate docstring example in `_shorten_verb_prefix`.
+
 ## [0.2.5] - 2026-05-16
 
 ### Added
@@ -58,7 +66,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dry-run and summary-only modes
 - Rich terminal output with diffs and optimization summaries
 
-[Unreleased]: https://github.com/tsjnsn/scpz/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/tsjnsn/scpz/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/tsjnsn/scpz/compare/v0.2.5...v0.2.6
+[0.2.5]: https://github.com/tsjnsn/scpz/compare/v0.2.3...v0.2.5
 [0.2.3]: https://github.com/tsjnsn/scpz/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/tsjnsn/scpz/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/tsjnsn/scpz/compare/v0.1.0...v0.2.1
