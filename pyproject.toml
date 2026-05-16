@@ -1,6 +1,6 @@
 [project]
 name = "scpz"
-version = "0.2.6"
+version = "0.2.7"
 description = "Intelligently optimize AWS SCP JSONs to adhere to strict size, statement, and policy count limits."
 readme = "README.md"
 license = { file = "LICENSE" }

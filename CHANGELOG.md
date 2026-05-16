@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-05-16
+
+### Fixed
+- Resolved ruff lint violations (UP037, SIM109, E501) in `actions.py` and tests introduced in v0.2.6.
+
 ## [0.2.6] - 2026-05-16
 
 ### Changed
@@ -66,7 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dry-run and summary-only modes
 - Rich terminal output with diffs and optimization summaries
 
-[Unreleased]: https://github.com/tsjnsn/scpz/compare/v0.2.6...HEAD
+[Unreleased]: https://github.com/tsjnsn/scpz/compare/v0.2.7...HEAD
+[0.2.7]: https://github.com/tsjnsn/scpz/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/tsjnsn/scpz/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/tsjnsn/scpz/compare/v0.2.3...v0.2.5
 [0.2.3]: https://github.com/tsjnsn/scpz/compare/v0.2.2...v0.2.3
