@@ -344,9 +344,7 @@ def _try_shorten_across_verbs(
             lcp_names = frozenset(name for name in all_names if name.startswith(lcp))
             candidate = f"{service}:{lcp}*"
 
-            if _wildcard_saves_bytes(candidate, window) and catalog.covers(
-                service, lcp, lcp_names
-            ):
+            if _wildcard_saves_bytes(candidate, window) and catalog.covers(service, lcp, lcp_names):
                 for item in window:
                     result.remove(item)
                 result.append(candidate)

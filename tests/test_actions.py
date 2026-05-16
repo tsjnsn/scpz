@@ -502,9 +502,9 @@ class TestAggressiveIndividualVerbShortening:
         )
         result = compress_actions([stmt], mode="aggressive", catalog=catalog)
         actions = result[0].action_list
-        assert "svc:D*" not in actions    # DeployApp and DescribeThings block D*
-        assert "svc:De*" not in actions   # DeployApp and DescribeThings block De*
-        assert "svc:Del*" in actions      # all Del* actions start with Delete
+        assert "svc:D*" not in actions  # DeployApp and DescribeThings block D*
+        assert "svc:De*" not in actions  # DeployApp and DescribeThings block De*
+        assert "svc:Del*" in actions  # all Del* actions start with Delete
         assert "svc:Delete*" not in actions
 
     def test_shortening_stops_before_interfering_prefix(self) -> None:
@@ -522,8 +522,8 @@ class TestAggressiveIndividualVerbShortening:
         )
         result = compress_actions([stmt], mode="aggressive", catalog=catalog)
         actions = result[0].action_list
-        assert "svc:Del*" not in actions   # DelimitedFoo starts with Del but not Delete
-        assert "svc:Dele*" in actions      # all catalog Dele* actions start with Delete
+        assert "svc:Del*" not in actions  # DelimitedFoo starts with Del but not Delete
+        assert "svc:Dele*" in actions  # all catalog Dele* actions start with Delete
         assert "svc:Delete*" not in actions
 
     def test_shortening_finds_safe_prefix_after_gap_in_catalog_data(self) -> None:
@@ -555,8 +555,14 @@ class TestAggressiveIndividualVerbShortening:
         """
         catalog = self._catalog(
             "svc",
-            ["DeleteFoo", "DeleteBar", "DenyAccess", "DescribeThing", "DelimitedObj",
-             "DelegateRole"],
+            [
+                "DeleteFoo",
+                "DeleteBar",
+                "DenyAccess",
+                "DescribeThing",
+                "DelimitedObj",
+                "DelegateRole",
+            ],
         )
         stmt = Statement(
             effect="Deny",
@@ -603,8 +609,10 @@ class TestAggressiveIndividualVerbShortening:
         stmt = Statement(
             effect="Deny",
             action=[
-                "svc:DeleteFoo", "svc:DeleteBar",
-                "svc:DeployApp", "svc:DeployOther",
+                "svc:DeleteFoo",
+                "svc:DeleteBar",
+                "svc:DeployApp",
+                "svc:DeployOther",
             ],
             resource="*",
         )
@@ -740,9 +748,7 @@ class TestAggressiveCrossVerbShortening:
         is also safe, but DetachFoo is a singleton group and individual
         shortening only applies to multi-item verb groups.
         """
-        catalog = self._catalog(
-            "svc", ["DeleteA", "DeleteB", "DetachFoo", "DescribeThings"]
-        )
+        catalog = self._catalog("svc", ["DeleteA", "DeleteB", "DetachFoo", "DescribeThings"])
         stmt = Statement(
             effect="Deny",
             action=["svc:DeleteA", "svc:DeleteB", "svc:DetachFoo"],
@@ -785,9 +791,7 @@ class TestAggressiveCrossVerbShortening:
 
     def test_iterative_shortening(self) -> None:
         """Two rounds of shortening: first De*, then D* if catalog allows."""
-        catalog = self._catalog(
-            "svc", ["DeleteA", "DetachB", "DisableFoo"]
-        )
+        catalog = self._catalog("svc", ["DeleteA", "DetachB", "DisableFoo"])
         stmt = Statement(
             effect="Deny",
             action=["svc:DeleteA", "svc:DetachB", "svc:DisableFoo"],
