@@ -207,20 +207,22 @@ def _compress_name_group(
     # --- Try a wildcard at the LCP level if it extends beyond base_prefix ---
     if len(lcp) > len(base_prefix):
         wildcard = f"{service}:{lcp}*"
-        if _wildcard_saves_bytes(wildcard, expanded):
-            if catalog is None or catalog.covers(service, lcp, frozenset(names)):
-                return [wildcard]
-            # Catalog signals the LCP wildcard would broaden scope;
-            # fall through to sub-grouping.
+        if _wildcard_saves_bytes(wildcard, expanded) and (
+            catalog is None or catalog.covers(service, lcp, frozenset(names))
+        ):
+            return [wildcard]
+        # Catalog signals the LCP wildcard would broaden scope;
+        # fall through to sub-grouping.
 
     # --- Catalog fallback: base_prefix-level wildcard ---
     # Only attempted when names diverge immediately (lcp == base_prefix) so
     # the LCP path above did not fire.  The catalog confirms full coverage.
     if lcp == base_prefix and catalog is not None:
         wildcard = f"{service}:{base_prefix}*"
-        if _wildcard_saves_bytes(wildcard, expanded):
-            if catalog.covers(service, base_prefix, frozenset(names)):
-                return [wildcard]
+        if _wildcard_saves_bytes(wildcard, expanded) and catalog.covers(
+            service, base_prefix, frozenset(names)
+        ):
+            return [wildcard]
 
     # --- Split by next character after LCP and recurse ---
     split_at = len(lcp)
@@ -239,7 +241,7 @@ def _wildcard_saves_bytes(wildcard: str, expanded: list[str]) -> bool:
     """Return True if *wildcard* produces fewer JSON bytes than *expanded*.
 
     Uses JSON-accurate accounting: each string in an array costs
-    ``len + 2`` bytes (surrounding quotes), and n elements need n−1 commas.
+    ``len + 2`` bytes (surrounding quotes), and n elements need n-1 commas.
     """
     wildcard_bytes = len(wildcard) + 2
     expanded_bytes = sum(len(a) + 2 for a in expanded) + len(expanded) - 1

@@ -134,7 +134,7 @@ def _split_by_field(
     while remaining:
         chunk: list[str] = []
         for item in remaining:
-            trial = chunk + [item]
+            trial = [*chunk, item]
             trial_val: list[str] | str = trial[0] if len(trial) == 1 else trial
             trial_stmt = stmt.model_copy(update={field_name: trial_val})
             trial_doc = ScpDocument(version=version, statement=[trial_stmt])
@@ -182,7 +182,7 @@ def _pack_statements_ffd(version: str, stmts: list[Statement]) -> list[ScpDocume
         for bin_stmts in bins:
             if len(bin_stmts) >= MAX_STATEMENTS_PER_SCP:
                 continue
-            candidate_doc = ScpDocument(version=version, statement=bin_stmts + [stmt])
+            candidate_doc = ScpDocument(version=version, statement=[*bin_stmts, stmt])
             if candidate_doc.size_bytes <= MAX_SCP_SIZE_BYTES:
                 bin_stmts.append(stmt)
                 placed = True
