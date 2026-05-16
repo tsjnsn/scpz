@@ -96,6 +96,25 @@
       "title": "ConfigSpec",
       "type": "object"
     },
+    "FixpointArgs": {
+      "additionalProperties": false,
+      "description": "Args for the fixpoint loop.\n\nWhen enabled, the optimizer re-runs all passes in sequence until the\nminified document stops changing or *maxRounds* is reached.  This lets\nlater passes (e.g. ``conditionMerge``) unlock earlier ones\n(e.g. ``statementMerge``) on subsequent rounds.",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "maxRounds": {
+          "default": 5,
+          "minimum": 1,
+          "title": "Maxrounds",
+          "type": "integer"
+        }
+      },
+      "title": "FixpointArgs",
+      "type": "object"
+    },
     "OutputConfig": {
       "additionalProperties": false,
       "description": "spec.output \u2014 controls how files are written.",
@@ -130,6 +149,9 @@
         },
         "split": {
           "$ref": "#/$defs/SplitArgs"
+        },
+        "fixpoint": {
+          "$ref": "#/$defs/FixpointArgs"
         }
       },
       "title": "PassesConfig",

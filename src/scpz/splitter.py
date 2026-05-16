@@ -82,9 +82,7 @@ def _fits_single(doc: ScpDocument) -> bool:
     return doc.size_bytes <= MAX_SCP_SIZE_BYTES and len(doc.statement) <= MAX_STATEMENTS_PER_SCP
 
 
-def _expand_oversized_statements(
-    stmts: list[Statement], version: str
-) -> list[Statement]:
+def _expand_oversized_statements(stmts: list[Statement], version: str) -> list[Statement]:
     """Replace any statement too large to fit alone with a list of smaller chunks."""
     result: list[Statement] = []
     for stmt in stmts:
@@ -152,7 +150,7 @@ def _split_by_field(
         chunk_val: list[str] | str = chunk[0] if len(chunk) == 1 else chunk
         chunk_stmt = stmt.model_copy(update={field_name: chunk_val})
         docs.append(ScpDocument(version=version, statement=[chunk_stmt]))
-        remaining = remaining[len(chunk):]
+        remaining = remaining[len(chunk) :]
 
     return docs
 
