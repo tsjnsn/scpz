@@ -19,16 +19,24 @@ Examples::
   guardduty:DeleteDetector + guardduty:DeleteMembers
       -> kept explicit                               (sub-groups are singletons)
 
-Catalog safety in conservative mode
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When a catalog is provided, it guards wildcards at every trie level:
+Catalog safety
+~~~~~~~~~~~~~~
+Conservative mode: a wildcard ``svc:prefix*`` is emitted only when the
+catalog confirms that every catalog action starting with *prefix* is already
+in the statement (or sub-group).  Without a catalog the LCP heuristic is
+trusted as-is.
 
-- A wildcard ``svc:prefix*`` is emitted only when the catalog confirms that
-  every catalog action starting with *prefix* is already in the statement
-  (or sub-group).  Without a catalog the LCP heuristic is trusted as-is.
-- If a prefix-level wildcard is blocked, the catalog is also checked for the
-  verb-level wildcard (``svc:Verb*``) when names diverge immediately at the
-  verb level.
+Aggressive mode with catalog: two additional passes run after the verb-level
+wildcards are produced.
+
+1. *Individual shortening* — each ``svc:Verb*`` wildcard is shortened to the
+   minimum prefix at which the catalog confirms no other verb families exist.
+   For example ``guardduty:Delete*`` → ``guardduty:Del*`` when the catalog
+   has no ``Del``-prefixed action outside the Delete family.
+
+2. *Cross-verb collapse* — adjacent shortened wildcards whose bare prefixes
+   share a common prefix are collapsed further when ``catalog.covers``
+   confirms full coverage at that shorter prefix.
 
 Byte-cost formula
 ~~~~~~~~~~~~~~~~~
@@ -70,10 +78,13 @@ def compress_actions(
         catalog confirms no additional actions would be covered.
     aggressive
         Verb-level wildcard for each verb group, e.g. ``iam:Delete*``.
-        When *catalog* is also provided, a second pass attempts to shorten
-        across verb groups: e.g. ``iam:Delete*`` + ``iam:DetachRolePolicy``
-        → ``iam:De*`` when the catalog confirms no other ``iam:De*`` actions
-        exist outside the statement.
+        When *catalog* is also provided, two additional passes run:
+
+        1. Each verb wildcard is shortened to the minimum safe prefix —
+           e.g. ``guardduty:Delete*`` → ``guardduty:Del*`` when the catalog
+           has no ``Del``-prefixed action outside the Delete family.
+        2. Adjacent shortened wildcards are collapsed further when
+           ``catalog.covers`` confirms a shared shorter prefix is safe.
     """
     return [_compress_statement_actions(s, mode=mode, catalog=catalog) for s in statements]
 
@@ -161,26 +172,22 @@ def _compress_service_actions(
         prefix = _extract_verb_prefix(name)
         by_prefix[prefix].append(name)
 
+    has_catalog = catalog is not None and not catalog.is_empty()
     result: list[str] = []
     for verb, group in sorted(by_prefix.items()):
         expanded = [f"{service}:{n}" for n in group]
         if len(group) >= 2 and verb and mode == "aggressive":
-            # Aggressive: emit verb-level wildcard, optionally shortened by catalog.
-            effective_verb = (
-                _shorten_verb_prefix(service, verb, catalog)
-                if catalog is not None and not catalog.is_empty()
-                else verb
-            )
+            if has_catalog and catalog is not None:
+                effective_verb = _shorten_verb_prefix(service, verb, catalog)
+            else:
+                effective_verb = verb
             wildcard = f"{service}:{effective_verb}*"
             if _wildcard_saves_bytes(wildcard, expanded):
                 result.append(wildcard)
                 continue
-        # Conservative (or aggressive group that didn't save bytes):
-        # recurse into the verb group using trie-based sub-group compression.
         result.extend(_compress_name_group(service, group, verb, mode=mode, catalog=catalog))
 
-    # Second pass (aggressive + catalog only): try shorter cross-verb prefixes.
-    if mode == "aggressive" and catalog is not None and not catalog.is_empty():
+    if mode == "aggressive" and has_catalog and catalog is not None:
         result = _try_shorten_across_verbs(service, names, result, catalog)
 
     return result
@@ -215,19 +222,15 @@ def _compress_name_group(
     lcp = find_longest_common_prefix(names)
     expanded = [f"{service}:{n}" for n in names]
 
-    # --- Try a wildcard at the LCP level if it extends beyond base_prefix ---
     if len(lcp) > len(base_prefix):
         wildcard = f"{service}:{lcp}*"
         if _wildcard_saves_bytes(wildcard, expanded) and (
             catalog is None or catalog.covers(service, lcp, frozenset(names))
         ):
             return [wildcard]
-        # Catalog signals the LCP wildcard would broaden scope;
-        # fall through to sub-grouping.
 
-    # --- Catalog fallback: base_prefix-level wildcard ---
-    # Only attempted when names diverge immediately (lcp == base_prefix) so
-    # the LCP path above did not fire.  The catalog confirms full coverage.
+    # Only when names diverge immediately (lcp == base_prefix) — the path
+    # above did not fire — try a catalog-confirmed verb-level wildcard.
     if lcp == base_prefix and catalog is not None:
         wildcard = f"{service}:{base_prefix}*"
         if _wildcard_saves_bytes(wildcard, expanded) and catalog.covers(
@@ -235,7 +238,6 @@ def _compress_name_group(
         ):
             return [wildcard]
 
-    # --- Split by next character after LCP and recurse ---
     split_at = len(lcp)
     groups: dict[str, list[str]] = {}
     for name in names:
@@ -265,11 +267,11 @@ def _shorten_verb_prefix(
 
     Example::
 
-        # catalog for "guardduty" has only Delete* actions starting with "Del"
+        # catalog "Del*" actions are exclusively "Delete*" — "Del" is safe
         _shorten_verb_prefix("guardduty", "Delete", catalog) -> "Del"
 
-        # catalog for "guardduty" has Describe* actions starting with "De"
-        _shorten_verb_prefix("guardduty", "Delete", catalog) -> "Delete"  (unchanged)
+        # catalog "Pu*" includes non-Put actions (e.g. PublishRecord) — no safe short prefix
+        _shorten_verb_prefix("example", "Put", catalog) -> "Put"  (unchanged)
     """
     known = catalog.get_service(service)
     if not known:
@@ -284,6 +286,11 @@ def _shorten_verb_prefix(
             return prefix
 
     return verb
+
+
+def _bare_prefix(item: str, service: str) -> str:
+    """Strip ``service:`` and trailing ``*`` from a compressed action item."""
+    return item[len(service) + 1 :].rstrip("*")
 
 
 def _try_shorten_across_verbs(
@@ -315,27 +322,25 @@ def _try_shorten_across_verbs(
 
         i = 0
         while i < n - 1:
-            # Grow a window of consecutive items sharing a common prefix
-            # shorter than any individual item's bare prefix.
+            # Grow a window of consecutive items whose bare prefixes share a
+            # common prefix strictly shorter than any individual bare prefix.
             window = [sorted_result[i]]
-            bare = [sorted_result[i][len(service) + 1 :].rstrip("*")]
+            lcp = _bare_prefix(sorted_result[i], service)
 
             for j in range(i + 1, n):
-                next_bare = sorted_result[j][len(service) + 1 :].rstrip("*")
-                candidate_bare = bare + [next_bare]
-                lcp = find_longest_common_prefix(candidate_bare)
+                next_bare = _bare_prefix(sorted_result[j], service)
+                # Incrementally narrow the LCP instead of recomputing from scratch.
+                new_lcp = os.path.commonprefix([lcp, next_bare])
                 # Stop if lcp vanishes or equals any item's bare prefix (no gain).
-                if not lcp or any(lcp == p for p in candidate_bare):
+                if not new_lcp or new_lcp == lcp or new_lcp == next_bare:
                     break
+                lcp = new_lcp
                 window.append(sorted_result[j])
-                bare = candidate_bare
 
             if len(window) < 2:
                 i += 1
                 continue
 
-            lcp = find_longest_common_prefix(bare)
-            # Gather original names covered by this shorter prefix for catalog check.
             lcp_names = frozenset(name for name in all_names if name.startswith(lcp))
             candidate = f"{service}:{lcp}*"
 
@@ -346,7 +351,7 @@ def _try_shorten_across_verbs(
                     result.remove(item)
                 result.append(candidate)
                 improved = True
-                break  # restart outer while loop with updated result
+                break
 
             i += 1
 
