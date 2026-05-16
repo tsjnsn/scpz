@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-05-16
+
+### Changed
+- README: fix installation instructions to show `pip install scpz` / `uv tool install scpz` for consumers
+- README: add Python 3.13+ requirements section
+- README: clarify `.bak` backup filename in optimize comment
+- README: move developer-only commands (`uv sync --dev`, schema regeneration) to Development section
+
 ## [0.2.1] - 2026-05-16
 
 ### Changed
@@ -29,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dry-run and summary-only modes
 - Rich terminal output with diffs and optimization summaries
 
-[Unreleased]: https://github.com/tsjnsn/scpz/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/tsjnsn/scpz/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/tsjnsn/scpz/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/tsjnsn/scpz/compare/v0.1.0...v0.2.1
 [0.1.0]: https://github.com/tsjnsn/scpz/releases/tag/v0.1.0

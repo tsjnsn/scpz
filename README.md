@@ -18,16 +18,20 @@ Intelligently optimize AWS Service Control Policy (SCP) JSONs to fit within AWS'
 | Statements per SCP | 5 |
 | SCPs per target (account/OU) | 10 |
 
+## Requirements
+
+Python 3.13 or later.
+
 ## Installation
 
 ```bash
-uv pip install -e .
+pip install scpz
 ```
 
-Or for development:
+Or with [uv](https://docs.astral.sh/uv/) (recommended):
 
 ```bash
-uv sync --dev
+uv tool install scpz
 ```
 
 ## Usage
@@ -35,7 +39,7 @@ uv sync --dev
 ### Optimize
 
 ```bash
-# Optimize a single file (in-place with .bak backup)
+# Optimize a single file in-place (original saved as policy.json.bak)
 scpz optimize-cmd policy.json
 
 # Optimize all JSON files in a directory
@@ -96,14 +100,14 @@ spec:
 ```bash
 # Print the JSON Schema for editor validation
 scpz schema
-
-# Regenerate the committed schema after model changes
-scpz schema -o schema/OptimizerConfig.json
 ```
 
 ## Development
 
 ```bash
+# Install with dev dependencies
+uv sync --dev
+
 # Run tests
 uv run pytest
 
@@ -112,6 +116,9 @@ uv run pytest --cov=scpz
 
 # Run a specific test file
 uv run pytest tests/test_actions.py -v
+
+# Regenerate the committed schema after model changes
+uv run scpz schema -o schema/OptimizerConfig.json
 ```
 
 ## License
