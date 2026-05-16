@@ -30,8 +30,7 @@ def write_config(tmp_path: Path, content: str) -> Path:
 def make_stmts(sids: list[str | None]) -> list[Statement]:
     """Two deny-all statements with given Sids that are mergeable."""
     return [
-        Statement(sid=sid, effect="Deny", action="s3:DeleteBucket", resource="*")
-        for sid in sids
+        Statement(sid=sid, effect="Deny", action="s3:DeleteBucket", resource="*") for sid in sids
     ]
 
 
@@ -242,9 +241,7 @@ class TestSidMergeModeEndToEnd:
 
     def test_join_concatenates_sids(self) -> None:
         stmts = make_stmts(["DenyA", "DenyB"])
-        merged = merge_statements(
-            stmts, sid_merge_mode=SidMergeMode.JOIN, sid_join_separator="+"
-        )
+        merged = merge_statements(stmts, sid_merge_mode=SidMergeMode.JOIN, sid_join_separator="+")
         assert len(merged) == 1
         assert merged[0].sid == "DenyA+DenyB"
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
+from scpeasy.catalog import ActionCatalog
 from scpeasy.config import OptimizerConfig
 from scpeasy.constants import MAX_SCP_SIZE_BYTES, MAX_STATEMENTS_PER_SCP
 from scpeasy.models import ScpDocument, Statement
@@ -82,6 +83,9 @@ def optimize(
     passes_applied: list[str] = []
     stmts = list(doc.statement)
 
+    # Load action catalog (used by actionCompress in conservative mode)
+    catalog = ActionCatalog.load(config.spec.catalog)
+
     # 1. Statement merging
     if passes_cfg.statementMerge.enabled:
         sm_args = passes_cfg.statementMerge
@@ -98,7 +102,11 @@ def optimize(
     # 2. Action wildcard compression
     if passes_cfg.actionCompress.enabled:
         prev = _serialise_stmts(stmts)
-        stmts = compress_actions(stmts, mode=passes_cfg.actionCompress.mode)
+        stmts = compress_actions(
+            stmts,
+            mode=passes_cfg.actionCompress.mode,
+            catalog=catalog,
+        )
         if _serialise_stmts(stmts) != prev:
             passes_applied.append("action-compress")
 

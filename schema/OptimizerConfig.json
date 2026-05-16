@@ -22,6 +22,37 @@
       "title": "ActionCompressArgs",
       "type": "object"
     },
+    "CatalogConfig": {
+      "additionalProperties": false,
+      "description": "spec.catalog \u2014 configures the AWS action catalog used by actionCompress.\n\nThe catalog lets conservative mode safely emit verb-level wildcards\n(e.g. ``iam:Delete*``) when every matching action in the catalog is\nalready present in the statement, guaranteeing no scope broadening.\n\nsource\n    ``bundled``  Use the catalog shipped with scpeasy (default).\n    ``file``     Load from a user-supplied JSON file (requires ``path``).\n    ``none``     Disable catalog; conservative mode falls back to LCP only.\npath\n    Path to a JSON file when ``source: file``; ignored otherwise.",
+      "properties": {
+        "source": {
+          "default": "bundled",
+          "enum": [
+            "bundled",
+            "file",
+            "none"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        }
+      },
+      "title": "CatalogConfig",
+      "type": "object"
+    },
     "ConditionMergeArgs": {
       "additionalProperties": false,
       "description": "Args for the conditionMerge pass.",
@@ -52,6 +83,9 @@
       "additionalProperties": false,
       "description": "The full spec block.",
       "properties": {
+        "catalog": {
+          "$ref": "#/$defs/CatalogConfig"
+        },
         "optimizer": {
           "$ref": "#/$defs/PassesConfig"
         },

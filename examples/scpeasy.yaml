@@ -20,20 +20,23 @@ metadata:
 
 spec:
 
-  # ── Action catalog (planned) ────────────────────────────────────────
-  # A catalog of known AWS actions enables catalog-aware wildcard compression.
-  # When present, actionCompress can safely emit broad wildcards like
-  # iam:Delete* only when every known iam:Delete... action is already listed
-  # in the statement — guaranteeing no unintended actions are added.
+  # ── Action catalog ─────────────────────────────────────────────────
+  # Enables catalog-aware wildcard compression in conservative mode.
+  # When the catalog confirms that every action matching a verb-level
+  # wildcard (e.g. iam:Delete*) is already listed in the statement,
+  # it is safe to emit the wildcard — zero scope broadening.
   # Without a catalog, the conservative LCP heuristic is the only safety net.
   #
-  # catalog:
-  #   source: bundled       # bundled | file | none
-  #                         #   bundled - catalog shipped with scpeasy
-  #                         #   file    - load from a local JSON file
-  #                         #   none    - disable catalog; fall back to LCP
-  #   path: null            # path to catalog file; only used when source: file
-  #                         # e.g. path: ./aws-actions-2025.json
+  # The bundled catalog is refreshed weekly from the AWS Service Reference API
+  # (https://servicereference.us-east-1.amazonaws.com/) and committed to the
+  # repo.  Run `python scripts/update_catalog.py` to refresh it manually.
+  catalog:
+    source: bundled       # bundled | file | none
+                          #   bundled - catalog shipped with scpeasy (default)
+                          #   file    - load from a local JSON file
+                          #   none    - disable catalog; fall back to LCP only
+    path: null            # path to catalog file; only used when source: file
+                          # e.g. path: ./my-aws-actions.json
 
   # ── Optimizer passes ───────────────────────────────────────────────
   # Each pass has an `enabled` key. Set `enabled: false` to disable a pass

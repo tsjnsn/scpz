@@ -132,8 +132,10 @@ def _optimize_file(
     result = optimize(doc, config=cfg)
 
     # --no-split CLI flag overrides config; otherwise honour split pass config
-    split_enabled = not no_split and cfg.spec.optimizer.split.enabled and (
-        cfg.spec.optimizer.split.strategy == "auto"
+    split_enabled = (
+        not no_split
+        and cfg.spec.optimizer.split.enabled
+        and (cfg.spec.optimizer.split.strategy == "auto")
     )
 
     # Check if splitting is needed
@@ -153,7 +155,9 @@ def _optimize_file(
             )
             return
     elif not result.fits_single_scp and not split_enabled:
-        console.print(f"[red]Error:[/red] {file_path.name} exceeds limits and splitting is disabled.")
+        console.print(
+            f"[red]Error:[/red] {file_path.name} exceeds limits and splitting is disabled."
+        )
         raise typer.Exit(code=1)
 
     # Single file output

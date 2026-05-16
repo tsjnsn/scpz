@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from scpeasy.catalog import ActionCatalog
 from scpeasy.models import Statement
 from scpeasy.optimizations.actions import _extract_verb_prefix, compress_actions
 
@@ -133,3 +134,98 @@ class TestActionCompression:
         actions = result[0].action_list
         assert "s3:Get*" in actions
         assert "ec2:Describe*" in actions
+
+
+class TestCatalogAwareCompression:
+    """conservative mode with catalog: verb-level wildcard when fully covered."""
+
+    def _catalog_with(self, svc: str, action_names: list[str]) -> ActionCatalog:
+        return ActionCatalog.from_dict({svc: action_names})
+
+    def test_catalog_enables_verb_wildcard_when_fully_covered(self) -> None:
+        """All Delete* actions present + catalog → iam:Delete* is emitted."""
+        catalog = self._catalog_with(
+            "iam",
+            ["DeleteRole", "DeleteUser"],
+        )
+        stmt = Statement(
+            effect="Deny",
+            action=["iam:DeleteRole", "iam:DeleteUser"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="conservative", catalog=catalog)
+        actions = result[0].action_list
+        assert "iam:Delete*" in actions
+
+    def test_catalog_suppressed_when_not_fully_covered(self) -> None:
+        """Catalog has a Delete* action that is NOT in the statement → no wildcard."""
+        catalog = self._catalog_with(
+            "iam",
+            ["DeleteRole", "DeleteUser", "DeletePolicy"],  # DeletePolicy not in stmt
+        )
+        stmt = Statement(
+            effect="Deny",
+            action=["iam:DeleteRole", "iam:DeleteUser"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="conservative", catalog=catalog)
+        actions = result[0].action_list
+        assert "iam:Delete*" not in actions
+        assert set(actions) == {"iam:DeleteRole", "iam:DeleteUser"}
+
+    def test_no_catalog_still_conservative(self) -> None:
+        """Without a catalog the old conservative behaviour is unchanged."""
+        stmt = Statement(
+            effect="Deny",
+            action=["iam:DeleteRole", "iam:DeleteUser"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="conservative", catalog=None)
+        actions = result[0].action_list
+        # LCP('DeleteRole','DeleteUser') == 'Delete' == verb → no wildcard without catalog
+        assert "iam:Delete*" not in actions
+
+    def test_catalog_does_not_affect_aggressive_mode(self) -> None:
+        """aggressive mode ignores the catalog (it always wildcards at verb level)."""
+        catalog = self._catalog_with(
+            "iam",
+            ["DeleteRole", "DeleteUser", "DeletePolicy"],  # partial — would block conservative
+        )
+        stmt = Statement(
+            effect="Deny",
+            action=["iam:DeleteRole", "iam:DeleteUser"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        # aggressive always uses verb wildcard when shorter
+        assert "iam:Delete*" in actions
+
+    def test_catalog_unknown_service_no_wildcard(self) -> None:
+        """Service not in catalog → catalog cannot confirm coverage → no verb wildcard."""
+        catalog = self._catalog_with("s3", ["GetObject"])  # no guardduty
+        stmt = Statement(
+            effect="Deny",
+            action=["guardduty:DeleteDetector", "guardduty:DeleteMembers"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="conservative", catalog=catalog)
+        actions = result[0].action_list
+        assert "guardduty:Delete*" not in actions
+
+    def test_lcp_wildcard_still_takes_precedence(self) -> None:
+        """LCP path fires before catalog check; tight wildcard is preferred."""
+        catalog = self._catalog_with(
+            "iam",
+            ["DeleteRole", "DeleteRolePolicy"],
+        )
+        stmt = Statement(
+            effect="Deny",
+            action=["iam:DeleteRole", "iam:DeleteRolePolicy"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="conservative", catalog=catalog)
+        actions = result[0].action_list
+        # LCP = 'DeleteRole' > verb 'Delete' → iam:DeleteRole* not iam:Delete*
+        assert "iam:DeleteRole*" in actions
+        assert "iam:Delete*" not in actions

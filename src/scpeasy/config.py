@@ -28,12 +28,11 @@ Example config::
 
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path  # noqa: TC003 — used at runtime by Pydantic validators
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ── Supported API version / kind ─────────────────────────────────────
 
@@ -147,6 +146,46 @@ class PassesConfig(BaseModel):
         return values
 
 
+# ── Catalog config ───────────────────────────────────────────────────
+
+
+CatalogSource = Literal["bundled", "file", "none"]
+
+
+class CatalogConfig(BaseModel):
+    """spec.catalog — configures the AWS action catalog used by actionCompress.
+
+    The catalog lets conservative mode safely emit verb-level wildcards
+    (e.g. ``iam:Delete*``) when every matching action in the catalog is
+    already present in the statement, guaranteeing no scope broadening.
+
+    source
+        ``bundled``  Use the catalog shipped with scpeasy (default).
+        ``file``     Load from a user-supplied JSON file (requires ``path``).
+        ``none``     Disable catalog; conservative mode falls back to LCP only.
+    path
+        Path to a JSON file when ``source: file``; ignored otherwise.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: CatalogSource = "bundled"
+    path: Path | None = None
+
+    @field_validator("path", mode="before")
+    @classmethod
+    def _coerce_none_path(cls, v: object) -> object:
+        """Accept an explicit null from YAML without complaint."""
+        return v
+
+    @model_validator(mode="after")
+    def _validate_path(self) -> CatalogConfig:
+        if self.source == "file" and self.path is None:
+            msg = "catalog.path is required when catalog.source is 'file'"
+            raise ValueError(msg)
+        return self
+
+
 # ── Top-level spec sections ───────────────────────────────────────────
 
 
@@ -163,6 +202,7 @@ class ConfigSpec(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    catalog: CatalogConfig = Field(default_factory=CatalogConfig)
     optimizer: PassesConfig = Field(default_factory=PassesConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
 
@@ -194,10 +234,7 @@ class OptimizerConfig(BaseModel):
     @model_validator(mode="after")
     def _validate_gvk(self) -> OptimizerConfig:
         if self.apiVersion != SUPPORTED_API_VERSION:
-            msg = (
-                f"Unsupported apiVersion '{self.apiVersion}'. "
-                f"Expected '{SUPPORTED_API_VERSION}'."
-            )
+            msg = f"Unsupported apiVersion '{self.apiVersion}'. Expected '{SUPPORTED_API_VERSION}'."
             raise ValueError(msg)
         if self.kind != SUPPORTED_KIND:
             msg = f"Unsupported kind '{self.kind}'. Expected '{SUPPORTED_KIND}'."

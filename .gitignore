@@ -8,3 +8,15 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Tool caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Test coverage
+.coverage
+htmlcov/
+
+# scpeasy optimizer backups (never commit)
+*.bak

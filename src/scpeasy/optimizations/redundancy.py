@@ -84,8 +84,7 @@ def _is_subsumed_by(a: Statement, b: Statement) -> bool:
         return False
     # Every action in A must be covered by at least one action in B.
     return all(
-        any(_covers(b_action, a_action) for b_action in b.action_list)
-        for a_action in a.action_list
+        any(_covers(b_action, a_action) for b_action in b.action_list) for a_action in a.action_list
     )
 
 

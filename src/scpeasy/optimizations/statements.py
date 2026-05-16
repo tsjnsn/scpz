@@ -19,9 +19,9 @@ if TYPE_CHECKING:
 class SidMergeMode(str, Enum):
     """Controls what happens to Sid fields when statements are merged."""
 
-    DROP = "drop"          # omit Sid entirely — fewest bytes
-    FIRST = "first"        # keep the Sid of the first statement in the group
-    JOIN = "join"          # concatenate all Sids with a separator
+    DROP = "drop"  # omit Sid entirely — fewest bytes
+    FIRST = "first"  # keep the Sid of the first statement in the group
+    JOIN = "join"  # concatenate all Sids with a separator
     JOIN_TRUNCATE = "joinTruncate"  # join then truncate to a maximum length
 
 

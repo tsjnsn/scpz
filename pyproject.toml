@@ -65,6 +65,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN", "T20"]
 "src/scpeasy/cli.py" = ["B008"]  # typer uses function calls as defaults
+"scripts/**" = ["T20", "ANN"]   # standalone scripts may use print()
 
 [tool.ruff.lint.isort]
 known-first-party = ["scpeasy"]

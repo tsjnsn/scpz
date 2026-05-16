@@ -17,6 +17,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from scpeasy.catalog import ActionCatalog
     from scpeasy.models import Statement
 
 
@@ -24,6 +25,7 @@ def compress_actions(
     statements: list[Statement],
     *,
     mode: str = "conservative",
+    catalog: ActionCatalog | None = None,
 ) -> list[Statement]:
     """Apply action wildcard compression to each statement.
 
@@ -32,14 +34,23 @@ def compress_actions(
     conservative
         Wildcard only when the LCP of action names extends beyond the verb
         prefix, producing tight patterns like ``iam:DeleteRole*``.
+        When *catalog* is provided, also wildcards at verb level when the
+        catalog confirms that every matching action is already in the
+        statement (``iam:Delete*`` is safe if all Delete* actions are listed).
     aggressive
         Wildcard at verb level (pre-LCP behaviour), e.g. ``iam:Delete*``.
-        Saves more bytes but may broaden policy scope.
+        Saves more bytes but may broaden policy scope.  *catalog* has no
+        effect in aggressive mode.
     """
-    return [_compress_statement_actions(s, mode=mode) for s in statements]
+    return [_compress_statement_actions(s, mode=mode, catalog=catalog) for s in statements]
 
 
-def _compress_statement_actions(stmt: Statement, *, mode: str) -> Statement:
+def _compress_statement_actions(
+    stmt: Statement,
+    *,
+    mode: str,
+    catalog: ActionCatalog | None,
+) -> Statement:
     """Compress actions within a single statement."""
     # Only compress Action, not NotAction (wildcards in NotAction are risky)
     if stmt.not_action is not None:
@@ -49,7 +60,7 @@ def _compress_statement_actions(stmt: Statement, *, mode: str) -> Statement:
     if len(actions) <= 1 or actions == ["*"]:
         return stmt
 
-    compressed = _compress_action_list(actions, mode=mode)
+    compressed = _compress_action_list(actions, mode=mode, catalog=catalog)
 
     new_action: list[str] | str = compressed
     if len(compressed) == 1:
@@ -58,7 +69,12 @@ def _compress_statement_actions(stmt: Statement, *, mode: str) -> Statement:
     return stmt.model_copy(update={"action": new_action})
 
 
-def _compress_action_list(actions: list[str], *, mode: str) -> list[str]:
+def _compress_action_list(
+    actions: list[str],
+    *,
+    mode: str,
+    catalog: ActionCatalog | None,
+) -> list[str]:
     """Find common prefixes among actions and replace with wildcards.
 
     Strategy:
@@ -83,15 +99,22 @@ def _compress_action_list(actions: list[str], *, mode: str) -> list[str]:
     result: list[str] = list(wildcards)
 
     for svc, names in sorted(by_service.items()):
-        result.extend(_compress_service_actions(svc, names, mode=mode))
+        result.extend(_compress_service_actions(svc, names, mode=mode, catalog=catalog))
 
     return sorted(set(result))
 
 
-def _compress_service_actions(service: str, names: list[str], *, mode: str) -> list[str]:
+def _compress_service_actions(
+    service: str,
+    names: list[str],
+    *,
+    mode: str,
+    catalog: ActionCatalog | None,
+) -> list[str]:
     """Compress action names within a single service.
 
-    conservative mode: wildcard only when LCP extends beyond the verb prefix.
+    conservative mode: wildcard only when LCP extends beyond the verb prefix,
+                       OR when the catalog confirms full verb-level coverage.
     aggressive mode:   wildcard at verb level (``service:Verb*``).
     """
     if len(names) <= 1:
@@ -119,6 +142,14 @@ def _compress_service_actions(service: str, names: list[str], *, mode: str) -> l
                 lcp = find_longest_common_prefix(group)
                 if len(lcp) > len(verb):
                     wildcard = f"{service}:{lcp}*"
+                    expanded_len = sum(len(a) for a in expanded) + len(expanded) - 1
+                    if len(wildcard) < expanded_len:
+                        result.append(wildcard)
+                        continue
+                # catalog fallback: verb-level wildcard is safe when the
+                # catalog confirms every matching action is already present
+                if catalog is not None and catalog.covers(service, verb, frozenset(names)):
+                    wildcard = f"{service}:{verb}*"
                     expanded_len = sum(len(a) for a in expanded) + len(expanded) - 1
                     if len(wildcard) < expanded_len:
                         result.append(wildcard)
