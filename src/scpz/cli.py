@@ -5,6 +5,7 @@ from __future__ import annotations
 import difflib
 import json
 import shutil
+import sys
 from pathlib import Path  # noqa: TC003  # required at runtime by Typer
 from typing import TYPE_CHECKING
 
@@ -233,7 +234,7 @@ def schema_cmd(
         output.write_text(text, encoding="utf-8")
         console.print(f"[green]✓ Schema written to {output}[/green]")
     else:
-        out.print(text, end="")
+        sys.stdout.write(text)
 
 
 # ── validate command ─────────────────────────────────────────────────
