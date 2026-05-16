@@ -7,14 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.4] - 2026-05-16
+## [0.2.5] - 2026-05-16
 
 ### Added
-- `actionCompress` aggressive mode now performs a catalog-verified cross-verb
-  prefix pass after the verb-level wildcard step. When a non-empty catalog is
-  provided and confirms full coverage, adjacent verb wildcards/singletons are
-  collapsed to a shorter common prefix (e.g. `svc:Delete*` + `svc:DetachFoo`
-  → `svc:De*`). Falls back to verb-level wildcards when the catalog blocks it.
+- `actionCompress` aggressive mode now performs shortest-prefix trimming when
+  a catalog is provided. Each verb-level wildcard is shortened to the minimum
+  prefix at which the catalog confirms no other verb families exist
+  (e.g. `guardduty:Delete*` → `guardduty:Del*`, `iam:Update*` → `iam:Upd*`).
+  A second cross-verb pass then collapses adjacent shortened wildcards when
+  the catalog confirms the merged prefix is still safe
+  (e.g. `svc:Del*` + `svc:Det*` → `svc:De*`).
 
 ### Fixed
 - `scpz validate` was emitting every constraint warning (statement count,

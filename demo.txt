@@ -2,7 +2,7 @@ $ pip install scpz
 ...
 
 $ scpz --version
-scpz 0.2.4
+scpz 0.2.5
 
 $ scpz --help
 
@@ -182,7 +182,7 @@ WARNING policy.json: SCP has 6 statements (limit is 5)
 $ scpz optimize-cmd policy.json --summary-only   # with scpz.yaml (max settings)
 WARNING policy.json: SCP has 6 statements (limit is 5)
 ╭──────────────────────────────── policy.json ─────────────────────────────────╮
-│ Size: 1,213 → 421 bytes (792 saved)                                          │
+│ Size: 1,213 → 399 bytes (814 saved)                                          │
 │ Statements: 6 → 1                                                            │
 │ Passes: statement-merge, action-compress                                     │
 ╰──────────────────────────────────────────────────────────────────────────────╯
@@ -190,7 +190,7 @@ WARNING policy.json: SCP has 6 statements (limit is 5)
 $ scpz optimize-cmd policy.json --dry-run        # full diff, max settings
 WARNING policy.json: SCP has 6 statements (limit is 5)
 ╭──────────────────────────────── policy.json ─────────────────────────────────╮
-│ Size: 1,213 → 421 bytes (792 saved)                                          │
+│ Size: 1,213 → 399 bytes (814 saved)                                          │
 │ Statements: 6 → 1                                                            │
 │ Passes: statement-merge, action-compress                                     │
 ╰──────────────────────────────────────────────────────────────────────────────╯
@@ -223,14 +223,14 @@ WARNING policy.json: SCP has 6 statements (limit is 5)
 +        "cloudtrail:PutEventSelectors",
 +        "cloudtrail:StopLogging",
 +        "cloudtrail:UpdateTrail",
-+        "config:Delete*",
++        "config:Dele*",
 +        "config:StopConfigurationRecorder",
-+        "guardduty:Delete*",
-+        "guardduty:Disassociate*",
++        "guardduty:Del*",
++        "guardduty:Disas*",
 +        "guardduty:UpdateDetector",
          "iam:AttachRolePolicy",
-+        "iam:Create*",
-+        "iam:Delete*",
++        "iam:Cr*",
++        "iam:Del*",
          "iam:DetachRolePolicy",
          "iam:PutRolePolicy",
 -        "iam:DeleteRolePolicy"
@@ -279,7 +279,7 @@ WARNING policy.json: SCP has 6 statements (limit is 5)
 -        "cloudtrail:DeleteTrail",
 -        "cloudtrail:UpdateTrail",
 -        "cloudtrail:PutEventSelectors"
-+        "iam:Update*"
++        "iam:Upd*"
        ],
        "Resource": "*"
      }

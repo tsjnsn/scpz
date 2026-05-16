@@ -165,8 +165,13 @@ def _compress_service_actions(
     for verb, group in sorted(by_prefix.items()):
         expanded = [f"{service}:{n}" for n in group]
         if len(group) >= 2 and verb and mode == "aggressive":
-            # Aggressive: emit verb-level wildcard when shorter.
-            wildcard = f"{service}:{verb}*"
+            # Aggressive: emit verb-level wildcard, optionally shortened by catalog.
+            effective_verb = (
+                _shorten_verb_prefix(service, verb, catalog)
+                if catalog is not None and not catalog.is_empty()
+                else verb
+            )
+            wildcard = f"{service}:{effective_verb}*"
             if _wildcard_saves_bytes(wildcard, expanded):
                 result.append(wildcard)
                 continue
@@ -241,6 +246,44 @@ def _compress_name_group(
     for _, group in sorted(groups.items()):
         result.extend(_compress_name_group(service, group, lcp, mode=mode, catalog=catalog))
     return result
+
+
+def _shorten_verb_prefix(
+    service: str,
+    verb: str,
+    catalog: "ActionCatalog",
+) -> str:
+    """Find the shortest prefix p where ``service:p*`` is scope-equivalent to ``service:verb*``.
+
+    A prefix *p* (a strict prefix of *verb*) is safe when every catalog action
+    for *service* that starts with *p* also starts with *verb* — meaning ``p*``
+    adds no new verb families beyond ``verb*``.
+
+    Scans from length 1 upward and returns the first safe prefix; returns
+    *verb* unchanged when no shorter prefix qualifies or the catalog has no
+    data for this service.
+
+    Example::
+
+        # catalog for "guardduty" has only Delete* actions starting with "Del"
+        _shorten_verb_prefix("guardduty", "Delete", catalog) -> "Del"
+
+        # catalog for "guardduty" has Describe* actions starting with "De"
+        _shorten_verb_prefix("guardduty", "Delete", catalog) -> "Delete"  (unchanged)
+    """
+    known = catalog.get_service(service)
+    if not known:
+        return verb
+
+    for length in range(1, len(verb)):
+        prefix = verb[:length]
+        prefix_actions = [n for n in known if n.startswith(prefix)]
+        if not prefix_actions:
+            continue  # no catalog data at this prefix length — skip
+        if all(n.startswith(verb) for n in prefix_actions):
+            return prefix
+
+    return verb
 
 
 def _try_shorten_across_verbs(

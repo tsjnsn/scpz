@@ -253,11 +253,17 @@ class TestCatalogAwareCompression:
         # LCP('DeleteRole','DeleteUser') == 'Delete' == verb → no wildcard without catalog
         assert "iam:Delete*" not in actions
 
-    def test_catalog_does_not_affect_aggressive_mode(self) -> None:
-        """aggressive mode ignores the catalog (it always wildcards at verb level)."""
+    def test_partial_catalog_does_not_suppress_aggressive_wildcard(self) -> None:
+        """Partial catalog coverage still produces a wildcard in aggressive mode.
+
+        Conservative mode would suppress iam:Delete* because DeletePolicy is in
+        the catalog but not the statement.  Aggressive mode still emits a
+        wildcard — and since all catalog "D*" iam actions start with "Delete"
+        in this minimal catalog, the prefix is further shortened to D*.
+        """
         catalog = self._catalog_with(
             "iam",
-            ["DeleteRole", "DeleteUser", "DeletePolicy"],  # partial — would block conservative
+            ["DeleteRole", "DeleteUser", "DeletePolicy"],
         )
         stmt = Statement(
             effect="Deny",
@@ -266,8 +272,10 @@ class TestCatalogAwareCompression:
         )
         result = compress_actions([stmt], mode="aggressive", catalog=catalog)
         actions = result[0].action_list
-        # aggressive always uses verb wildcard when shorter
-        assert "iam:Delete*" in actions
+        # A wildcard must be emitted — the exact prefix depends on catalog data.
+        # With this minimal catalog where every "D*" action starts with "Delete",
+        # the prefix shortens all the way to "D".
+        assert "iam:D*" in actions
 
     def test_catalog_unknown_service_no_wildcard(self) -> None:
         """Service not in catalog → catalog cannot confirm coverage → no verb wildcard."""
@@ -444,6 +452,253 @@ class TestIntraStatementSubsumption:
         assert result[0].not_action == original
 
 
+class TestAggressiveIndividualVerbShortening:
+    """aggressive + catalog: verb-level wildcard is shortened as far as catalog allows."""
+
+    def _catalog(self, svc: str, action_names: list[str]) -> ActionCatalog:
+        return ActionCatalog.from_dict({svc: action_names})
+
+    # ── Basic behaviour ───────────────────────────────────────────────
+
+    def test_basic_shortening_to_first_unique_prefix(self) -> None:
+        """Delete* shortens to D* when all catalog D* actions start with Delete.
+
+        CreateThing starts with C, not D, so the only catalog D* actions are
+        Delete*.  The shortest safe prefix is therefore D (length 1).
+        """
+        catalog = self._catalog("svc", ["DeleteFoo", "DeleteBar", "CreateThing"])
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:DeleteFoo", "svc:DeleteBar"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        assert "svc:D*" in actions
+        assert "svc:Delete*" not in actions
+
+    def test_single_char_prefix_safe(self) -> None:
+        """When all catalog G* actions start with Get, Get* shortens all the way to G*."""
+        catalog = self._catalog("svc", ["GetFoo", "GetBar", "GetBaz"])
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:GetFoo", "svc:GetBar"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        assert "svc:G*" in actions
+
+    def test_shortening_blocked_at_d_but_safe_at_del(self) -> None:
+        """D* blocked (Deploy* exists), De* blocked (Describe* exists), Del* safe."""
+        catalog = self._catalog(
+            "svc",
+            ["DeleteFoo", "DeleteBar", "DeployApp", "DescribeThings"],
+        )
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:DeleteFoo", "svc:DeleteBar"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        assert "svc:D*" not in actions    # DeployApp and DescribeThings block D*
+        assert "svc:De*" not in actions   # DeployApp and DescribeThings block De*
+        assert "svc:Del*" in actions      # all Del* actions start with Delete
+        assert "svc:Delete*" not in actions
+
+    def test_shortening_stops_before_interfering_prefix(self) -> None:
+        """Del* is blocked by DelimitedFoo, but Dele* is safe and emitted instead.
+
+        DelimitedFoo: D-e-l-i vs Delete: D-e-l-e-t → they diverge at position 3
+        (index 3 is 'i' vs 'e'), so 'Del' captures both but 'Dele' captures only
+        Delete*.
+        """
+        catalog = self._catalog("svc", ["DeleteFoo", "DeleteBar", "DelimitedFoo"])
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:DeleteFoo", "svc:DeleteBar"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        assert "svc:Del*" not in actions   # DelimitedFoo starts with Del but not Delete
+        assert "svc:Dele*" in actions      # all catalog Dele* actions start with Delete
+        assert "svc:Delete*" not in actions
+
+    def test_shortening_finds_safe_prefix_after_gap_in_catalog_data(self) -> None:
+        """Catalog has no actions at D or De, but has actions at Del that are all Delete*.
+
+        The function skips prefix lengths with no catalog data and finds the
+        first length where catalog data exists and is fully within the verb.
+        """
+        catalog = self._catalog("svc", ["DeleteFoo", "DeleteBar"])
+        # No other "D" or "De" prefixed actions exist in the catalog.
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:DeleteFoo", "svc:DeleteBar"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        # "D" prefix: catalog D* = {DeleteFoo, DeleteBar}, all start with Delete → D* is safe
+        assert "svc:D*" in actions
+
+    def test_shortening_finds_deepest_safe_prefix(self) -> None:
+        """Each blocking action narrows the safe prefix one level deeper.
+
+        D*    blocked — DenyAccess starts with D but not Delete
+        De*   blocked — DescribeThing starts with De but not Delete
+        Del*  blocked — DelimitedObj (Deli) and DelegateRole (Dele) start with Del but not Delete
+        Dele* blocked — DelegateRole starts with Dele but not Delete
+        Delet* safe   — DelegateRole starts with Dele NOT Delet; DeleteFoo/Bar do start with Delet
+        """
+        catalog = self._catalog(
+            "svc",
+            ["DeleteFoo", "DeleteBar", "DenyAccess", "DescribeThing", "DelimitedObj", "DelegateRole"],
+        )
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:DeleteFoo", "svc:DeleteBar"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        assert "svc:Delet*" in actions
+        assert "svc:Delete*" not in actions
+
+    # ── Interaction between two verb groups ───────────────────────────
+
+    def test_two_groups_shorten_independently(self) -> None:
+        """Each verb group finds its own shortest safe prefix independently."""
+        catalog = self._catalog(
+            "svc",
+            ["DeleteFoo", "DeleteBar", "CreateThing", "CreateOther", "DeployApp"],
+        )
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:DeleteFoo", "svc:DeleteBar", "svc:CreateThing", "svc:CreateOther"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        # Delete group: D* blocked (DeployApp), De* blocked (DeployApp), Del* safe
+        assert "svc:Del*" in actions
+        # Create group: C* — only Create* actions exist for C → C* is safe
+        assert "svc:C*" in actions
+
+    def test_individual_shortening_then_cross_verb_collapses_to_de(self) -> None:
+        """Delete → Del*, Deploy → Dep*, then cross-verb pass collapses both to De*.
+
+        Individual pass: D* blocked (Deploy* ∉ Delete*), De* blocked same reason,
+        Del* safe for Delete group, Dep* safe for Deploy group.
+        Cross-verb pass: LCP(Del, Dep) = De; catalog De* = all four actions, all
+        covered → De* is emitted.
+        """
+        catalog = self._catalog(
+            "svc",
+            ["DeleteFoo", "DeleteBar", "DeployApp", "DeployOther"],
+        )
+        stmt = Statement(
+            effect="Deny",
+            action=[
+                "svc:DeleteFoo", "svc:DeleteBar",
+                "svc:DeployApp", "svc:DeployOther",
+            ],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        assert actions == ["svc:De*"]
+
+    # ── Conservative mode unaffected ──────────────────────────────────
+
+    def test_conservative_mode_does_not_shorten_verb_prefix(self) -> None:
+        """Individual verb prefix shortening is aggressive-only; conservative is unchanged."""
+        catalog = self._catalog("svc", ["DeleteFoo", "DeleteBar"])
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:DeleteFoo", "svc:DeleteBar"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="conservative", catalog=catalog)
+        actions = result[0].action_list
+        # Conservative: LCP("DeleteFoo","DeleteBar")="Delete" > verb → DeleteFoo* ... wait
+        # Actually LCP = "DeleteF" ... no: Delete-Foo vs Delete-Bar → LCP = "Delete"
+        # LCP("DeleteFoo","DeleteBar") = "Delete" (D-e-l-e-t-e, then F vs B → stop)
+        # LCP == verb → no trie wildcard without catalog; catalog.covers("svc","Delete",{F,B})
+        # = all catalog Delete* ∈ {F,B} → True → iam:Delete* emitted in conservative mode
+        # But NOT shortened to Del* or D*.
+        assert "svc:Delete*" in actions
+        assert "svc:Del*" not in actions
+        assert "svc:D*" not in actions
+
+    # ── No catalog ────────────────────────────────────────────────────
+
+    def test_no_catalog_stays_at_verb_level(self) -> None:
+        """Without catalog, aggressive mode never shortens below verb level."""
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:DeleteFoo", "svc:DeleteBar"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=None)
+        actions = result[0].action_list
+        assert "svc:Delete*" in actions
+        assert "svc:Del*" not in actions
+
+    def test_unknown_service_in_catalog_stays_at_verb_level(self) -> None:
+        """Catalog has data for a different service — unknown service → no shortening."""
+        catalog = self._catalog("other", ["DeleteFoo", "DeleteBar"])
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:DeleteFoo", "svc:DeleteBar"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        assert "svc:Delete*" in actions
+        assert "svc:Del*" not in actions
+
+    # ── Interaction with cross-verb pass ──────────────────────────────
+
+    def test_individual_shortening_then_cross_verb_merge(self) -> None:
+        """Individual shortening to Del*/Det*, then cross-verb pass merges to De*."""
+        catalog = self._catalog(
+            "svc",
+            ["DeleteFoo", "DeleteBar", "DetachX", "DetachY"],
+        )
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:DeleteFoo", "svc:DeleteBar", "svc:DetachX", "svc:DetachY"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        # Individual: Delete → Del* (safe), Detach → Det* (safe)
+        # Cross-verb: LCP(Del, Det) = De; catalog De* = all four actions → De* safe
+        assert actions == ["svc:De*"]
+
+    def test_individual_shortening_then_cross_verb_blocked(self) -> None:
+        """Individual shortening works but cross-verb merge is blocked by catalog."""
+        catalog = self._catalog(
+            "svc",
+            ["DeleteFoo", "DeleteBar", "DetachX", "DetachY", "DescribeAll"],
+        )
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:DeleteFoo", "svc:DeleteBar", "svc:DetachX", "svc:DetachY"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        # Individual: Delete → Del* (safe), Detach → Det* (safe)
+        # Cross-verb: LCP(Del, Det) = De; catalog De* includes DescribeAll → blocked
+        assert "svc:De*" not in actions
+        assert "svc:Del*" in actions
+        assert "svc:Det*" in actions
+
+
 class TestAggressiveCrossVerbShortening:
     """aggressive + catalog: shorter cross-verb prefix when catalog confirms safety."""
 
@@ -474,8 +729,16 @@ class TestAggressiveCrossVerbShortening:
         actions = result[0].action_list
         assert actions == ["svc:De*"]
 
-    def test_catalog_blocks_shorter_prefix_when_uncovered_action_exists(self) -> None:
-        """Catalog has DescribeThings (starts with De) not in stmt → De* is unsafe."""
+    def test_catalog_blocks_cross_verb_prefix_when_uncovered_action_exists(self) -> None:
+        """DescribeThings starts with De but not Delete or Detach → De* is blocked.
+
+        However, Del* is still safe for the Delete group (no catalog action
+        starts with Del without also starting with Delete), so Del* replaces
+        Delete*.  DetachFoo stays as a singleton — Dis/Det shortening depends
+        on whether catalog has other Det* actions; here it has none, so Det*
+        is also safe, but DetachFoo is a singleton group and individual
+        shortening only applies to multi-item verb groups.
+        """
         catalog = self._catalog(
             "svc", ["DeleteA", "DeleteB", "DetachFoo", "DescribeThings"]
         )
@@ -486,8 +749,11 @@ class TestAggressiveCrossVerbShortening:
         )
         result = compress_actions([stmt], mode="aggressive", catalog=catalog)
         actions = result[0].action_list
+        # De* blocked — DescribeThings starts with De but is not in stmt
         assert "svc:De*" not in actions
-        assert "svc:Delete*" in actions
+        # Delete group (2 items) → Del* (all catalog Del* actions start with Delete)
+        assert "svc:Del*" in actions
+        # DetachFoo is a singleton → stays explicit
         assert "svc:DetachFoo" in actions
 
     def test_no_catalog_no_cross_verb_shortening(self) -> None:
