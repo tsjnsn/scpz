@@ -70,8 +70,10 @@ def compress_actions(
         catalog confirms no additional actions would be covered.
     aggressive
         Verb-level wildcard for each verb group, e.g. ``iam:Delete*``.
-        Saves more bytes but may broaden policy scope.  *catalog* has no
-        effect in aggressive mode.
+        When *catalog* is also provided, a second pass attempts to shorten
+        across verb groups: e.g. ``iam:Delete*`` + ``iam:DetachRolePolicy``
+        → ``iam:De*`` when the catalog confirms no other ``iam:De*`` actions
+        exist outside the statement.
     """
     return [_compress_statement_actions(s, mode=mode, catalog=catalog) for s in statements]
 
@@ -172,6 +174,10 @@ def _compress_service_actions(
         # recurse into the verb group using trie-based sub-group compression.
         result.extend(_compress_name_group(service, group, verb, mode=mode, catalog=catalog))
 
+    # Second pass (aggressive + catalog only): try shorter cross-verb prefixes.
+    if mode == "aggressive" and catalog is not None and not catalog.is_empty():
+        result = _try_shorten_across_verbs(service, names, result, catalog)
+
     return result
 
 
@@ -234,6 +240,73 @@ def _compress_name_group(
     result: list[str] = []
     for _, group in sorted(groups.items()):
         result.extend(_compress_name_group(service, group, lcp, mode=mode, catalog=catalog))
+    return result
+
+
+def _try_shorten_across_verbs(
+    service: str,
+    all_names: list[str],
+    items: list[str],
+    catalog: "ActionCatalog",
+) -> list[str]:
+    """Replace verb-level results with shorter catalog-safe prefixes where possible.
+
+    Iteratively finds runs of 2+ sorted items whose bare prefixes share a
+    common prefix *shorter* than any individual item's prefix, then attempts
+    ``service:lcp*`` — emitting it only when the catalog confirms no
+    additional actions would be covered.  Repeats until no progress is made.
+
+    Example::
+
+        items   = ["svc:Delete*", "svc:DetachFoo"]
+        catalog = {"svc": ["DeleteA", "DeleteB", "DetachFoo"]}
+        result  = ["svc:De*"]   # lcp="De", catalog confirms full coverage
+    """
+    result = list(items)
+    improved = True
+
+    while improved:
+        improved = False
+        sorted_result = sorted(result)
+        n = len(sorted_result)
+
+        i = 0
+        while i < n - 1:
+            # Grow a window of consecutive items sharing a common prefix
+            # shorter than any individual item's bare prefix.
+            window = [sorted_result[i]]
+            bare = [sorted_result[i][len(service) + 1 :].rstrip("*")]
+
+            for j in range(i + 1, n):
+                next_bare = sorted_result[j][len(service) + 1 :].rstrip("*")
+                candidate_bare = bare + [next_bare]
+                lcp = find_longest_common_prefix(candidate_bare)
+                # Stop if lcp vanishes or equals any item's bare prefix (no gain).
+                if not lcp or any(lcp == p for p in candidate_bare):
+                    break
+                window.append(sorted_result[j])
+                bare = candidate_bare
+
+            if len(window) < 2:
+                i += 1
+                continue
+
+            lcp = find_longest_common_prefix(bare)
+            # Gather original names covered by this shorter prefix for catalog check.
+            lcp_names = frozenset(name for name in all_names if name.startswith(lcp))
+            candidate = f"{service}:{lcp}*"
+
+            if _wildcard_saves_bytes(candidate, window) and catalog.covers(
+                service, lcp, lcp_names
+            ):
+                for item in window:
+                    result.remove(item)
+                result.append(candidate)
+                improved = True
+                break  # restart outer while loop with updated result
+
+            i += 1
+
     return result
 
 

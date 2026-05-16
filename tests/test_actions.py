@@ -442,3 +442,92 @@ class TestIntraStatementSubsumption:
         stmt = Statement(effect="Deny", not_action=original, resource="*")
         result = compress_actions([stmt])
         assert result[0].not_action == original
+
+
+class TestAggressiveCrossVerbShortening:
+    """aggressive + catalog: shorter cross-verb prefix when catalog confirms safety."""
+
+    def _catalog(self, svc: str, action_names: list[str]) -> ActionCatalog:
+        return ActionCatalog.from_dict({svc: action_names})
+
+    def test_verb_wildcard_and_singleton_collapse_to_shorter_prefix(self) -> None:
+        """Delete* + singleton DetachFoo → De* when catalog lists only those three."""
+        catalog = self._catalog("svc", ["DeleteA", "DeleteB", "DetachFoo"])
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:DeleteA", "svc:DeleteB", "svc:DetachFoo"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        assert actions == ["svc:De*"]
+
+    def test_two_verb_wildcards_collapse_to_shorter_prefix(self) -> None:
+        """Delete* + Detach* → De* when catalog lists only those actions."""
+        catalog = self._catalog("svc", ["DeleteA", "DeleteB", "DetachX", "DetachY"])
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:DeleteA", "svc:DeleteB", "svc:DetachX", "svc:DetachY"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        assert actions == ["svc:De*"]
+
+    def test_catalog_blocks_shorter_prefix_when_uncovered_action_exists(self) -> None:
+        """Catalog has DescribeThings (starts with De) not in stmt → De* is unsafe."""
+        catalog = self._catalog(
+            "svc", ["DeleteA", "DeleteB", "DetachFoo", "DescribeThings"]
+        )
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:DeleteA", "svc:DeleteB", "svc:DetachFoo"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        assert "svc:De*" not in actions
+        assert "svc:Delete*" in actions
+        assert "svc:DetachFoo" in actions
+
+    def test_no_catalog_no_cross_verb_shortening(self) -> None:
+        """Without a catalog, aggressive mode stops at verb level."""
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:DeleteA", "svc:DeleteB", "svc:DetachFoo"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=None)
+        actions = result[0].action_list
+        assert "svc:De*" not in actions
+        assert "svc:Delete*" in actions
+
+    def test_unrelated_verbs_not_collapsed(self) -> None:
+        """Verbs sharing no common prefix are left at verb level."""
+        catalog = self._catalog("svc", ["CreateFoo", "UpdateBar"])
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:CreateFoo", "svc:UpdateBar"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        assert "svc:De*" not in actions
+        assert "svc:CreateFoo" in actions
+        assert "svc:UpdateBar" in actions
+
+    def test_iterative_shortening(self) -> None:
+        """Two rounds of shortening: first De*, then D* if catalog allows."""
+        catalog = self._catalog(
+            "svc", ["DeleteA", "DetachB", "DisableFoo"]
+        )
+        stmt = Statement(
+            effect="Deny",
+            action=["svc:DeleteA", "svc:DetachB", "svc:DisableFoo"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        actions = result[0].action_list
+        # All three share "D"; De* would cover Delete+Detach but not Disable.
+        # D* covers all three and catalog confirms full coverage.
+        assert actions == ["svc:D*"]

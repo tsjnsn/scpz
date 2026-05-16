@@ -1,0 +1,285 @@
+$ pip install scpz
+...
+
+$ scpz --version
+scpz 0.2.4
+
+$ scpz --help
+
+                                                                                
+ Usage: scpz [OPTIONS] COMMAND [ARGS]...                                        
+                                                                                
+ Intelligently optimize AWS SCP JSONs.                                          
+                                                                                
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --version  -V        Show version and exit.                                  │
+│ --help               Show this message and exit.                             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ───────────────────────────────────────────────────────────────────╮
+│ optimize-cmd  Optimize SCP JSON file(s) to fit within AWS limits.            │
+│ schema        Print the JSON Schema for scpz.yaml to stdout.                 │
+│ validate      Validate SCP JSON file(s) without modifying them.              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+$ scpz validate bloated_deny.json
+WARNING bloated_deny.json: SCP has 8 statements (limit is 5)
+✓ All files are valid.
+
+$ scpz optimize-cmd bloated_deny.json --summary-only
+WARNING bloated_deny.json: SCP has 8 statements (limit is 5)
+╭───────────────────────────── bloated_deny.json ──────────────────────────────╮
+│ Size: 1,510 → 511 bytes (999 saved)                                          │
+│ Statements: 8 → 2                                                            │
+│ Passes: statement-merge, action-compress                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+$ scpz optimize-cmd bloated_deny.json --dry-run
+WARNING bloated_deny.json: SCP has 8 statements (limit is 5)
+╭───────────────────────────── bloated_deny.json ──────────────────────────────╮
+│ Size: 1,510 → 511 bytes (999 saved)                                          │
+│ Statements: 8 → 2                                                            │
+│ Passes: statement-merge, action-compress                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- bloated_deny.json
++++ bloated_deny.json (optimized)
+@@ -4,62 +4,13 @@
+     {
+       "Sid": "DenyS3PublicAccess",
+       "Effect": "Deny",
+-      "Action": "s3:PutBucketPublicAccessBlock",
+-      "Resource": "*",
+-      "Condition": {
+-        "StringNotEqualsIfExists": {
+-          "aws:PrincipalArn": "arn:aws:iam::123456789012:role/SecurityAdmin"
+-        }
+-      }
+-    },
+-    {
+-      "Sid": "DenyS3PolicyChanges",
+-      "Effect": "Deny",
+-      "Action": "s3:PutBucketPolicy",
+-      "Resource": "*",
+-      "Condition": {
+-        "StringNotEqualsIfExists": {
+-          "aws:PrincipalArn": "arn:aws:iam::123456789012:role/SecurityAdmin"
+-        }
+-      }
+-    },
+-    {
+-      "Sid": "DenyS3AclChanges",
+-      "Effect": "Deny",
+-      "Action": "s3:PutBucketAcl",
+-      "Resource": "*",
+-      "Condition": {
+-        "StringNotEqualsIfExists": {
+-          "aws:PrincipalArn": "arn:aws:iam::123456789012:role/SecurityAdmin"
+-        }
+-      }
+-    },
+-    {
+-      "Sid": "DenyS3EncryptionChanges",
+-      "Effect": "Deny",
+-      "Action": "s3:PutEncryptionConfiguration",
+-      "Resource": "*",
+-      "Condition": {
+-        "StringNotEqualsIfExists": {
+-          "aws:PrincipalArn": "arn:aws:iam::123456789012:role/SecurityAdmin"
+-        }
+-      }
+-    },
+-    {
+-      "Sid": "DenyS3VersioningChanges",
+-      "Effect": "Deny",
+-      "Action": "s3:PutBucketVersioning",
+-      "Resource": "*",
+-      "Condition": {
+-        "StringNotEqualsIfExists": {
+-          "aws:PrincipalArn": "arn:aws:iam::123456789012:role/SecurityAdmin"
+-        }
+-      }
+-    },
+-    {
+-      "Sid": "DenyS3LoggingChanges",
+-      "Effect": "Deny",
+-      "Action": "s3:PutBucketLogging",
++      "Action": [
++        "s3:PutBucketAcl",
++        "s3:PutBucketLogging",
++        "s3:PutBucketP*",
++        "s3:PutBucketVersioning",
++        "s3:PutEncryptionConfiguration"
++      ],
+       "Resource": "*",
+       "Condition": {
+         "StringNotEqualsIfExists": {
+@@ -70,16 +21,11 @@
+     {
+       "Sid": "DenyLeaveOrg",
+       "Effect": "Deny",
+-      "Action": "organizations:LeaveOrganization",
+-      "Resource": "*"
+-    },
+-    {
+-      "Sid": "DenyCloudTrailStop",
+-      "Effect": "Deny",
+       "Action": [
++        "cloudtrail:DeleteTrail",
++        "cloudtrail:PutEventSelectors",
+         "cloudtrail:StopLogging",
+-        "cloudtrail:DeleteTrail",
+-        "cloudtrail:PutEventSelectors"
++        "organizations:LeaveOrganization"
+       ],
+       "Resource": "*"
+     }
+
+$ scpz optimize-cmd bloated_deny.json
+WARNING bloated_deny.json: SCP has 8 statements (limit is 5)
+Backup: bloated_deny.json.bak
+✓ Wrote bloated_deny.json
+╭───────────────────────────── bloated_deny.json ──────────────────────────────╮
+│ Size: 1,510 → 511 bytes (999 saved)                                          │
+│ Statements: 8 → 2                                                            │
+│ Passes: statement-merge, action-compress                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+────────────────────────────────────────────────────────────────────────────────
+Max optimization (scpz.yaml)
+────────────────────────────────────────────────────────────────────────────────
+
+# scpz.yaml controls optimization settings. Three knobs beyond defaults:
+#
+#   actionCompress.mode: aggressive   — wildcard at verb level (iam:Delete*)
+#                                       instead of sub-verb only (iam:DeleteRole*)
+#   statementMerge.sidOnMerge: drop   — omit Sid on merged statements (fewest bytes)
+#   redundancyEliminate.enabled: true — remove statements subsumed by others
+
+$ cat scpz.yaml
+apiVersion: scpz.io/v1alpha1
+kind: OptimizerConfig
+metadata:
+  name: max
+spec:
+  optimizer:
+    statementMerge:
+      sidOnMerge: drop
+    actionCompress:
+      mode: aggressive
+    redundancyEliminate:
+      enabled: true
+
+# Input: 6 statements written by a human, split by intent.
+# One is a duplicate ("AlsoNoDeleteRole" repeats actions already in "DenyIAMRoleMgmt").
+
+$ scpz optimize-cmd policy.json --summary-only   # default settings, no scpz.yaml
+WARNING policy.json: SCP has 6 statements (limit is 5)
+╭──────────────────────────────── policy.json ─────────────────────────────────╮
+│ Size: 1,213 → 813 bytes (400 saved)                                          │
+│ Statements: 6 → 1                                                            │
+│ Passes: statement-merge, action-compress                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+$ scpz optimize-cmd policy.json --summary-only   # with scpz.yaml (max settings)
+WARNING policy.json: SCP has 6 statements (limit is 5)
+╭──────────────────────────────── policy.json ─────────────────────────────────╮
+│ Size: 1,213 → 421 bytes (792 saved)                                          │
+│ Statements: 6 → 1                                                            │
+│ Passes: statement-merge, action-compress                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+$ scpz optimize-cmd policy.json --dry-run        # full diff, max settings
+WARNING policy.json: SCP has 6 statements (limit is 5)
+╭──────────────────────────────── policy.json ─────────────────────────────────╮
+│ Size: 1,213 → 421 bytes (792 saved)                                          │
+│ Statements: 6 → 1                                                            │
+│ Passes: statement-merge, action-compress                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+--- policy.json
++++ policy.json (optimized)
+@@ -2,74 +2,23 @@
+   "Version": "2012-10-17",
+   "Statement": [
+     {
+-      "Sid": "DenyIAMUserMgmt",
+       "Effect": "Deny",
+       "Action": [
+-        "iam:CreateUser",
+-        "iam:DeleteUser",
+-        "iam:UpdateUser",
+-        "iam:CreateAccessKey",
+-        "iam:DeleteAccessKey",
+-        "iam:UpdateAccessKey"
+-      ],
+-      "Resource": "*"
+-    },
+-    {
+-      "Sid": "DenyIAMRoleMgmt",
+-      "Effect": "Deny",
+-      "Action": [
+-        "iam:CreateRole",
+-        "iam:DeleteRole",
+-        "iam:UpdateRole",
++        "cloudtrail:DeleteTrail",
++        "cloudtrail:PutEventSelectors",
++        "cloudtrail:StopLogging",
++        "cloudtrail:UpdateTrail",
++        "config:Delete*",
++        "config:StopConfigurationRecorder",
++        "guardduty:Delete*",
++        "guardduty:Disassociate*",
++        "guardduty:UpdateDetector",
+         "iam:AttachRolePolicy",
++        "iam:Create*",
++        "iam:Delete*",
+         "iam:DetachRolePolicy",
+         "iam:PutRolePolicy",
+-        "iam:DeleteRolePolicy"
+-      ],
+-      "Resource": "*"
+-    },
+-    {
+-      "Sid": "AlsoNoDeleteRole",
+-      "Effect": "Deny",
+-      "Action": [
+-        "iam:DeleteRole",
+-        "iam:DeleteRolePolicy"
+-      ],
+-      "Resource": "*"
+-    },
+-    {
+-      "Sid": "DenyGuardDutyTampering",
+-      "Effect": "Deny",
+-      "Action": [
+-        "guardduty:DeleteDetector",
+-        "guardduty:DeleteMembers",
+-        "guardduty:DeleteFilter",
+-        "guardduty:DeleteIPSet",
+-        "guardduty:UpdateDetector",
+-        "guardduty:DisassociateMembers",
+-        "guardduty:DisassociateFromMasterAccount"
+-      ],
+-      "Resource": "*"
+-    },
+-    {
+-      "Sid": "DenyConfigTampering",
+-      "Effect": "Deny",
+-      "Action": [
+-        "config:DeleteConfigurationRecorder",
+-        "config:DeleteDeliveryChannel",
+-        "config:DeleteRetentionConfiguration",
+-        "config:StopConfigurationRecorder"
+-      ],
+-      "Resource": "*"
+-    },
+-    {
+-      "Sid": "DenyCloudTrailTampering",
+-      "Effect": "Deny",
+-      "Action": [
+-        "cloudtrail:StopLogging",
+-        "cloudtrail:DeleteTrail",
+-        "cloudtrail:UpdateTrail",
+-        "cloudtrail:PutEventSelectors"
++        "iam:Update*"
+       ],
+       "Resource": "*"
+     }

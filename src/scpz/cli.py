@@ -17,7 +17,7 @@ from scpz import __version__
 from scpz.config import SUPPORTED_API_VERSION, SUPPORTED_KIND, OptimizerConfig
 from scpz.optimizer import OptimizationResult, optimize
 from scpz.splitter import SplitError, split_if_needed
-from scpz.validator import Severity, ValidationResult, validate_document, validate_file
+from scpz.validator import Severity, ValidationResult, validate_file
 
 if TYPE_CHECKING:
     from scpz.models import ScpDocument
@@ -252,13 +252,8 @@ def validate_cmd(
 
     has_errors = False
     for file_path in files:
-        doc, val_result = validate_file(file_path)
+        _, val_result = validate_file(file_path)
         _print_validation(val_result, file_path)
-        if doc is not None:
-            doc_result = validate_document(doc)
-            _print_validation(doc_result, file_path)
-            if not doc_result.is_valid:
-                has_errors = True
         if not val_result.is_valid:
             has_errors = True
 

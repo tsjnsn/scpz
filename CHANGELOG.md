@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-05-16
+
+### Added
+- `actionCompress` aggressive mode now performs a catalog-verified cross-verb
+  prefix pass after the verb-level wildcard step. When a non-empty catalog is
+  provided and confirms full coverage, adjacent verb wildcards/singletons are
+  collapsed to a shorter common prefix (e.g. `svc:Delete*` + `svc:DetachFoo`
+  → `svc:De*`). Falls back to verb-level wildcards when the catalog blocks it.
+
+### Fixed
+- `scpz validate` was emitting every constraint warning (statement count,
+  size) twice because `validate_file` already runs `validate_document`
+  internally, but `validate_cmd` called it a second time.
+
 ## [0.2.3] - 2026-05-16
 
 ### Fixed
