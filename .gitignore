@@ -18,5 +18,5 @@ wheels/
 .coverage
 htmlcov/
 
-# scpeasy optimizer backups (never commit)
+# scpz optimizer backups (never commit)
 *.bak

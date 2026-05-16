@@ -23,10 +23,10 @@ from pathlib import Path  # noqa: TC003 — used at runtime in from_file()
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from scpeasy.config import CatalogConfig
+    from scpz.config import CatalogConfig
 
 # Package-relative path to the bundled catalog file
-_DATA_PACKAGE = "scpeasy.data"
+_DATA_PACKAGE = "scpz.data"
 _CATALOG_FILE = "aws_actions.json"
 
 
@@ -61,7 +61,7 @@ class ActionCatalog:
 
     @classmethod
     def bundled(cls) -> ActionCatalog:
-        """Load the catalog shipped with the scpeasy package."""
+        """Load the catalog shipped with the scpz package."""
         pkg = resources.files(_DATA_PACKAGE)
         text = (pkg / _CATALOG_FILE).read_text(encoding="utf-8")
         raw: dict[str, list[str]] = json.loads(text)

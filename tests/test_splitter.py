@@ -1,12 +1,12 @@
-"""Tests for scpeasy.splitter."""
+"""Tests for scpz.splitter."""
 
 from __future__ import annotations
 
 import pytest
 
-from scpeasy.constants import MAX_SCPS_PER_TARGET, MAX_STATEMENTS_PER_SCP
-from scpeasy.models import ScpDocument, Statement
-from scpeasy.splitter import SplitError, split_if_needed
+from scpz.constants import MAX_SCPS_PER_TARGET, MAX_STATEMENTS_PER_SCP
+from scpz.models import ScpDocument, Statement
+from scpz.splitter import SplitError, split_if_needed
 
 
 class TestSplitter:

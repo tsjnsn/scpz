@@ -17,8 +17,8 @@ from collections import defaultdict
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from scpeasy.catalog import ActionCatalog
-    from scpeasy.models import Statement
+    from scpz.catalog import ActionCatalog
+    from scpz.models import Statement
 
 
 def compress_actions(

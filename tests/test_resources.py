@@ -1,9 +1,9 @@
-"""Tests for scpeasy.optimizations.resources."""
+"""Tests for scpz.optimizations.resources."""
 
 from __future__ import annotations
 
-from scpeasy.models import Statement
-from scpeasy.optimizations.resources import optimize_resources
+from scpz.models import Statement
+from scpz.optimizations.resources import optimize_resources
 
 
 class TestResourceOptimization:

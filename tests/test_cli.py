@@ -1,4 +1,4 @@
-"""Tests for scpeasy.cli."""
+"""Tests for scpz.cli."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from typer.testing import CliRunner
 
-from scpeasy.cli import app
+from scpz.cli import app
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -20,7 +20,7 @@ class TestVersion:
     def test_version_flag(self) -> None:
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
-        assert "scpeasy" in result.stdout
+        assert "scpz" in result.stdout
 
 
 class TestValidateCommand:

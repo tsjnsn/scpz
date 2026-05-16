@@ -1,4 +1,4 @@
-"""SCPeasy CLI — optimize and validate AWS SCP policies."""
+"""scpz CLI — optimize and validate AWS SCP policies."""
 
 from __future__ import annotations
 
@@ -12,17 +12,17 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 
-from scpeasy import __version__
-from scpeasy.config import SUPPORTED_API_VERSION, SUPPORTED_KIND, OptimizerConfig
-from scpeasy.optimizer import OptimizationResult, optimize
-from scpeasy.splitter import SplitError, split_if_needed
-from scpeasy.validator import Severity, ValidationResult, validate_document, validate_file
+from scpz import __version__
+from scpz.config import SUPPORTED_API_VERSION, SUPPORTED_KIND, OptimizerConfig
+from scpz.optimizer import OptimizationResult, optimize
+from scpz.splitter import SplitError, split_if_needed
+from scpz.validator import Severity, ValidationResult, validate_document, validate_file
 
 if TYPE_CHECKING:
-    from scpeasy.models import ScpDocument
+    from scpz.models import ScpDocument
 
 app = typer.Typer(
-    name="scpeasy",
+    name="scpz",
     help="Intelligently optimize AWS SCP JSONs.",
     no_args_is_help=True,
     add_completion=False,
@@ -33,7 +33,7 @@ out = Console()
 
 def version_callback(value: bool) -> None:
     if value:
-        out.print(f"scpeasy {__version__}")
+        out.print(f"scpz {__version__}")
         raise typer.Exit()
 
 
@@ -48,7 +48,7 @@ def main(
         is_eager=True,
     ),
 ) -> None:
-    """SCPeasy — Intelligently optimize AWS SCP JSONs."""
+    """scpz — Intelligently optimize AWS SCP JSONs."""
 
 
 # ── optimize command ─────────────────────────────────────────────────
@@ -217,14 +217,14 @@ def schema_cmd(
         help="Write schema to a file instead of stdout.",
     ),
 ) -> None:
-    """Print the JSON Schema for scpeasy.yaml to stdout."""
+    """Print the JSON Schema for scpz.yaml to stdout."""
     schema = OptimizerConfig.model_json_schema()
     # Annotate with $schema and $id so editors (e.g. VS Code YAML extension)
     # can resolve and apply the schema automatically.
     schema.setdefault("$schema", "https://json-schema.org/draft/2020-12/schema")
     schema.setdefault(
         "$id",
-        f"https://scpeasy.io/schemas/{SUPPORTED_API_VERSION}/{SUPPORTED_KIND}.json",
+        f"https://scpz.io/schemas/{SUPPORTED_API_VERSION}/{SUPPORTED_KIND}.json",
     )
     text = json.dumps(schema, indent=2) + "\n"
 

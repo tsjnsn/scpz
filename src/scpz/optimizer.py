@@ -8,15 +8,15 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
-from scpeasy.catalog import ActionCatalog
-from scpeasy.config import OptimizerConfig
-from scpeasy.constants import MAX_SCP_SIZE_BYTES, MAX_STATEMENTS_PER_SCP
-from scpeasy.models import ScpDocument, Statement
-from scpeasy.optimizations.actions import compress_actions
-from scpeasy.optimizations.conditions import merge_conditions
-from scpeasy.optimizations.redundancy import eliminate_redundancy
-from scpeasy.optimizations.resources import optimize_resources
-from scpeasy.optimizations.statements import SidMergeMode, merge_statements
+from scpz.catalog import ActionCatalog
+from scpz.config import OptimizerConfig
+from scpz.constants import MAX_SCP_SIZE_BYTES, MAX_STATEMENTS_PER_SCP
+from scpz.models import ScpDocument, Statement
+from scpz.optimizations.actions import compress_actions
+from scpz.optimizations.conditions import merge_conditions
+from scpz.optimizations.redundancy import eliminate_redundancy
+from scpz.optimizations.resources import optimize_resources
+from scpz.optimizations.statements import SidMergeMode, merge_statements
 
 
 @dataclass

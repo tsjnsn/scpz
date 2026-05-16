@@ -10,7 +10,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from scpeasy.models import Statement
+    from scpz.models import Statement
 
 
 def merge_conditions(statements: list[Statement]) -> list[Statement]:

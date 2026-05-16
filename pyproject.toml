@@ -1,5 +1,5 @@
 [project]
-name = "scpeasy"
+name = "scpz"
 version = "0.1.0"
 description = "Intelligently optimize AWS SCP JSONs to adhere to strict size, statement, and policy count limits."
 readme = "README.md"
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-scpeasy = "scpeasy.cli:app"
+scpz = "scpz.cli:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -64,11 +64,11 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN", "T20"]
-"src/scpeasy/cli.py" = ["B008"]  # typer uses function calls as defaults
+"src/scpz/cli.py" = ["B008"]  # typer uses function calls as defaults
 "scripts/**" = ["T20", "ANN"]   # standalone scripts may use print()
 
 [tool.ruff.lint.isort]
-known-first-party = ["scpeasy"]
+known-first-party = ["scpz"]
 
 [tool.mypy]
 python_version = "3.13"

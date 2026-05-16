@@ -1,11 +1,11 @@
-"""Tests for scpeasy.validator."""
+"""Tests for scpz.validator."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from scpeasy.models import ScpDocument
-from scpeasy.validator import (
+from scpz.models import ScpDocument
+from scpz.validator import (
     Severity,
     validate_document,
     validate_file,

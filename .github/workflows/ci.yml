@@ -76,7 +76,7 @@ jobs:
         run: uv sync --dev
 
       - name: Run tests
-        run: uv run pytest --cov=scpeasy --cov-report=term-missing -v
+        run: uv run pytest --cov=scpz --cov-report=term-missing -v
 
       - name: Check SCP fixtures are valid JSON
         run: |
@@ -86,5 +86,5 @@ jobs:
 
       - name: Check schema is up to date
         run: |
-          uv run scpeasy schema | diff - schema/OptimizerConfig.json || \
-            (echo "schema/OptimizerConfig.json is out of date. Run: scpeasy schema -o schema/OptimizerConfig.json" && exit 1)
+          uv run scpz schema | diff - schema/OptimizerConfig.json || \
+            (echo "schema/OptimizerConfig.json is out of date. Run: scpz schema -o schema/OptimizerConfig.json" && exit 1)

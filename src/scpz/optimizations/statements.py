@@ -10,10 +10,10 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from scpeasy.optimizations.conditions import conditions_equal
+from scpz.optimizations.conditions import conditions_equal
 
 if TYPE_CHECKING:
-    from scpeasy.models import Statement
+    from scpz.models import Statement
 
 
 class SidMergeMode(str, Enum):

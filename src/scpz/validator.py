@@ -9,14 +9,14 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from scpeasy.constants import (
+from scpz.constants import (
     CONDITION_OPERATORS,
     GLOBAL_CONDITION_KEYS,
     MAX_SCP_SIZE_BYTES,
     MAX_STATEMENTS_PER_SCP,
     SERVICE_PREFIXES,
 )
-from scpeasy.models import ScpDocument, Statement
+from scpz.models import ScpDocument, Statement
 
 
 class Severity(Enum):

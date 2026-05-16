@@ -1,12 +1,12 @@
-"""Project configuration for scpeasy.
+"""Project configuration for scpz.
 
 Follows the Kubernetes object model: apiVersion / kind / metadata / spec.
 Discovered by walking up the directory tree from the input file, looking for
-``scpeasy.yaml``.  Falls back to defaults when no file is found.
+``scpz.yaml``.  Falls back to defaults when no file is found.
 
 Example config::
 
-    apiVersion: scpeasy.io/v1alpha1
+    apiVersion: scpz.io/v1alpha1
     kind: OptimizerConfig
     metadata:
       name: default
@@ -36,9 +36,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 # ── Supported API version / kind ─────────────────────────────────────
 
-SUPPORTED_API_VERSION = "scpeasy.io/v1alpha1"
+SUPPORTED_API_VERSION = "scpz.io/v1alpha1"
 SUPPORTED_KIND = "OptimizerConfig"
-CONFIG_FILENAME = "scpeasy.yaml"
+CONFIG_FILENAME = "scpz.yaml"
 
 
 # ── Per-pass arg models ───────────────────────────────────────────────
@@ -160,7 +160,7 @@ class CatalogConfig(BaseModel):
     already present in the statement, guaranteeing no scope broadening.
 
     source
-        ``bundled``  Use the catalog shipped with scpeasy (default).
+        ``bundled``  Use the catalog shipped with scpz (default).
         ``file``     Load from a user-supplied JSON file (requires ``path``).
         ``none``     Disable catalog; conservative mode falls back to LCP only.
     path
@@ -253,7 +253,7 @@ class OptimizerConfig(BaseModel):
 
     @classmethod
     def load(cls, start_path: Path) -> OptimizerConfig:
-        """Discover and load ``scpeasy.yaml`` by walking up from *start_path*.
+        """Discover and load ``scpz.yaml`` by walking up from *start_path*.
 
         *start_path* may be a file or directory.  The search starts from the
         file's parent directory (or the directory itself).  Returns
@@ -273,7 +273,7 @@ class OptimizerConfig(BaseModel):
 
     @classmethod
     def _parse_file(cls, path: Path) -> OptimizerConfig:
-        """Parse and validate a ``scpeasy.yaml`` file."""
+        """Parse and validate a ``scpz.yaml`` file."""
         try:
             raw = yaml.safe_load(path.read_text(encoding="utf-8"))
         except yaml.YAMLError as exc:

@@ -1,7 +1,7 @@
-# scpeasy — Agent Rules
+# scpz — Agent Rules
 
 ## Project overview
-scpeasy is a Python CLI tool that optimizes AWS Service Control Policy (SCP) JSON
+scpz is a Python CLI tool that optimizes AWS Service Control Policy (SCP) JSON
 files to fit within AWS's strict limits (5,120 bytes, 5 statements per SCP).
 
 - **Package manager:** `uv` (never use `pip` directly)
@@ -20,11 +20,11 @@ uv run mypy src/
 uv run pytest -q
 ```
 
-If you change `src/scpeasy/config.py` (Pydantic models), also regenerate the
+If you change `src/scpz/config.py` (Pydantic models), also regenerate the
 committed schema file:
 
 ```bash
-uv run scpeasy schema -o schema/OptimizerConfig.json
+uv run scpz schema -o schema/OptimizerConfig.json
 ```
 
 ## Code conventions
@@ -37,7 +37,7 @@ uv run scpeasy schema -o schema/OptimizerConfig.json
   and into the `optimize()` function in `optimizer.py`
 - New passes require a corresponding test file `tests/test_<pass>.py`
 
-## Config schema (scpeasy.yaml)
+## Config schema (scpz.yaml)
 
 The config format follows the Kubernetes object model:
 `apiVersion / kind / metadata / spec`. Do not add flat top-level keys outside

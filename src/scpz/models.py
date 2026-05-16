@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-from scpeasy.constants import REQUIRED_SCP_VERSION, VALID_EFFECTS
+from scpz.constants import REQUIRED_SCP_VERSION, VALID_EFFECTS
 
 
 class Statement(BaseModel):

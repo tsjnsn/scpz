@@ -1,9 +1,9 @@
-"""Tests for scpeasy.optimizations.statements."""
+"""Tests for scpz.optimizations.statements."""
 
 from __future__ import annotations
 
-from scpeasy.models import ScpDocument, Statement
-from scpeasy.optimizations.statements import merge_statements
+from scpz.models import ScpDocument, Statement
+from scpz.optimizations.statements import merge_statements
 
 
 class TestStatementMerging:

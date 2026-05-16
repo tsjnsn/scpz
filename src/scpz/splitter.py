@@ -9,12 +9,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from scpeasy.constants import (
+from scpz.constants import (
     MAX_SCP_SIZE_BYTES,
     MAX_SCPS_PER_TARGET,
     MAX_STATEMENTS_PER_SCP,
 )
-from scpeasy.models import ScpDocument, Statement
+from scpz.models import ScpDocument, Statement
 
 
 class SplitError(Exception):

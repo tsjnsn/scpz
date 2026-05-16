@@ -18,7 +18,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from scpeasy.models import Statement
+    from scpz.models import Statement
 
 
 def optimize_resources(statements: list[Statement]) -> list[Statement]:

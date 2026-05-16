@@ -1,4 +1,4 @@
-# SCPeasy
+# scpz
 
 Intelligently optimize AWS Service Control Policy (SCP) JSONs to fit within AWS's strict limits.
 
@@ -28,44 +28,44 @@ uv sync --dev
 
 ```bash
 # Optimize a single file (in-place with .bak backup)
-scpeasy optimize-cmd policy.json
+scpz optimize-cmd policy.json
 
 # Optimize all JSON files in a directory
-scpeasy optimize-cmd policies/
+scpz optimize-cmd policies/
 
 # Dry run — show diff + summary without writing
-scpeasy optimize-cmd policy.json --dry-run
+scpz optimize-cmd policy.json --dry-run
 
 # Summary only — just show what would change
-scpeasy optimize-cmd policy.json --summary-only
+scpz optimize-cmd policy.json --summary-only
 
 # Write to a different file
-scpeasy optimize-cmd policy.json --output optimized.json
+scpz optimize-cmd policy.json --output optimized.json
 
 # Error instead of auto-splitting
-scpeasy optimize-cmd policy.json --no-split
+scpz optimize-cmd policy.json --no-split
 ```
 
 ### Validate
 
 ```bash
 # Validate a single file
-scpeasy validate policy.json
+scpz validate policy.json
 
 # Validate all JSON files in a directory
-scpeasy validate policies/
+scpz validate policies/
 ```
 
 ## Optimization Passes
 
-SCPeasy runs the following optimizations in order:
+scpz runs the following optimizations in order:
 
 1. **Statement merging** — Combines statements that share the same Effect, Condition, and Resource into a single statement with a unioned Action list.
 2. **Action wildcard compression** — Replaces groups of actions sharing a common prefix with wildcard patterns (e.g. `s3:GetObject` + `s3:GetBucketPolicy` → `s3:Get*`).
 3. **Condition merging** — Deduplicates condition values and merges equivalent condition blocks.
 4. **Resource ARN optimization** — Collapses multiple specific ARNs into wildcard patterns (e.g. `role/Admin` + `role/ReadOnly` → `role/*`).
 
-When a policy still exceeds limits after optimization, SCPeasy automatically splits it into multiple SCP documents (up to 5 per target).
+When a policy still exceeds limits after optimization, scpz automatically splits it into multiple SCP documents (up to 5 per target).
 
 ## Development
 
@@ -74,7 +74,7 @@ When a policy still exceeds limits after optimization, SCPeasy automatically spl
 uv run pytest
 
 # Run tests with coverage
-uv run pytest --cov=scpeasy
+uv run pytest --cov=scpz
 
 # Run a specific test file
 uv run pytest tests/test_actions.py -v

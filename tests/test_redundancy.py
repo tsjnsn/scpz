@@ -1,11 +1,11 @@
-"""Tests for scpeasy.optimizations.redundancy."""
+"""Tests for scpz.optimizations.redundancy."""
 
 from __future__ import annotations
 
 import pytest
 
-from scpeasy.models import Statement
-from scpeasy.optimizations.redundancy import _covers, eliminate_redundancy
+from scpz.models import Statement
+from scpz.optimizations.redundancy import _covers, eliminate_redundancy
 
 
 # ── Helpers ───────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-"""Tests for scpeasy.config."""
+"""Tests for scpz.config."""
 
 from __future__ import annotations
 
@@ -7,22 +7,22 @@ from pathlib import Path
 
 import pytest
 
-from scpeasy.config import (
+from scpz.config import (
     SUPPORTED_API_VERSION,
     SUPPORTED_KIND,
     OptimizerConfig,
     PassesConfig,
     StatementMergeArgs,
 )
-from scpeasy.models import Statement
-from scpeasy.optimizations.statements import SidMergeMode, merge_statements
+from scpz.models import Statement
+from scpz.optimizations.statements import SidMergeMode, merge_statements
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
 
 
 def write_config(tmp_path: Path, content: str) -> Path:
-    cfg = tmp_path / "scpeasy.yaml"
+    cfg = tmp_path / "scpz.yaml"
     cfg.write_text(textwrap.dedent(content), encoding="utf-8")
     return cfg
 
@@ -114,7 +114,7 @@ class TestConfigValidation:
         write_config(
             tmp_path,
             f"""
-            apiVersion: scpeasy.io/v99
+            apiVersion: scpz.io/v99
             kind: {SUPPORTED_KIND}
             """,
         )

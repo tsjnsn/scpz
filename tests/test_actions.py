@@ -1,10 +1,10 @@
-"""Tests for scpeasy.optimizations.actions."""
+"""Tests for scpz.optimizations.actions."""
 
 from __future__ import annotations
 
-from scpeasy.catalog import ActionCatalog
-from scpeasy.models import Statement
-from scpeasy.optimizations.actions import _extract_verb_prefix, compress_actions
+from scpz.catalog import ActionCatalog
+from scpz.models import Statement
+from scpz.optimizations.actions import _extract_verb_prefix, compress_actions
 
 
 class TestVerbPrefixExtraction:

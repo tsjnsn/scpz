@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from scpeasy.models import ScpDocument
+from scpz.models import ScpDocument
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 

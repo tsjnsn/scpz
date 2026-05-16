@@ -1,4 +1,4 @@
-"""Tests for scpeasy.catalog.ActionCatalog."""
+"""Tests for scpz.catalog.ActionCatalog."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from scpeasy.catalog import ActionCatalog
-from scpeasy.config import CatalogConfig
+from scpz.catalog import ActionCatalog
+from scpz.config import CatalogConfig
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 

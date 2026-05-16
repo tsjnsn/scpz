@@ -1,9 +1,9 @@
-"""Tests for scpeasy.optimizations.conditions."""
+"""Tests for scpz.optimizations.conditions."""
 
 from __future__ import annotations
 
-from scpeasy.models import Statement
-from scpeasy.optimizations.conditions import conditions_equal, merge_conditions
+from scpz.models import Statement
+from scpz.optimizations.conditions import conditions_equal, merge_conditions
 
 
 class TestConditionsEqual:

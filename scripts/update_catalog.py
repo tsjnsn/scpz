@@ -11,7 +11,7 @@ JSON file mapping IAM service prefixes to sorted action-name lists::
 
     {"iam": ["AddClientIDToOpenIDConnectProvider", ...], "s3": [...], ...}
 
-This file is committed as ``src/scpeasy/data/aws_actions.json`` and loaded
+This file is committed as ``src/scpz/data/aws_actions.json`` and loaded
 at runtime via ``importlib.resources``.  It should be refreshed periodically
 (the CI workflow does this weekly).
 """
@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 INDEX_URL = "https://servicereference.us-east-1.amazonaws.com/"
-DEFAULT_OUT = Path(__file__).parent.parent / "src" / "scpeasy" / "data" / "aws_actions.json"
+DEFAULT_OUT = Path(__file__).parent.parent / "src" / "scpz" / "data" / "aws_actions.json"
 MAX_WORKERS = 20
 TIMEOUT = 30
 

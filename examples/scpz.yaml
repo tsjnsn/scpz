@@ -1,14 +1,14 @@
-# Kitchen-sink reference configuration for scpeasy.
+# Kitchen-sink reference configuration for scpz.
 # Every supported option is shown with its default value and all valid choices.
 # Planned (not yet implemented) options are shown commented out.
 #
-# To validate your own scpeasy.yaml against the JSON Schema:
-#   scpeasy schema | python -m jsonschema - --instance your-scpeasy.yaml
+# To validate your own scpz.yaml against the JSON Schema:
+#   scpz schema | python -m jsonschema - --instance your-scpz.yaml
 #
 # To regenerate the committed schema after model changes:
-#   scpeasy schema -o schema/OptimizerConfig.json
+#   scpz schema -o schema/OptimizerConfig.json
 
-apiVersion: scpeasy.io/v1alpha1
+apiVersion: scpz.io/v1alpha1
 kind: OptimizerConfig
 metadata:
   name: examples
@@ -32,7 +32,7 @@ spec:
   # repo.  Run `python scripts/update_catalog.py` to refresh it manually.
   catalog:
     source: bundled       # bundled | file | none
-                          #   bundled - catalog shipped with scpeasy (default)
+                          #   bundled - catalog shipped with scpz (default)
                           #   file    - load from a local JSON file
                           #   none    - disable catalog; fall back to LCP only
     path: null            # path to catalog file; only used when source: file

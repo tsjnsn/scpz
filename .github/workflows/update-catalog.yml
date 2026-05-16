@@ -31,7 +31,7 @@ jobs:
       - name: Check for changes
         id: diff
         run: |
-          git diff --quiet src/scpeasy/data/aws_actions.json \
+          git diff --quiet src/scpz/data/aws_actions.json \
             && echo "changed=false" >> "$GITHUB_OUTPUT" \
             || echo "changed=true" >> "$GITHUB_OUTPUT"
 
@@ -44,7 +44,7 @@ jobs:
           delete-branch: true
           title: "chore: update AWS action catalog"
           body: |
-            Automated weekly refresh of `src/scpeasy/data/aws_actions.json`
+            Automated weekly refresh of `src/scpz/data/aws_actions.json`
             from the AWS Service Reference API
             (`https://servicereference.us-east-1.amazonaws.com/`).
 
