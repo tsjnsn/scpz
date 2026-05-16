@@ -24,5 +24,6 @@ repos:
           - pydantic>=2
           - typer>=0.15
           - rich>=13
+          - types-PyYAML>=6
         args: [--config-file, pyproject.toml]
         pass_filenames: false
