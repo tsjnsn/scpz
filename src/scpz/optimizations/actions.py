@@ -253,7 +253,7 @@ def _compress_name_group(
 def _shorten_verb_prefix(
     service: str,
     verb: str,
-    catalog: "ActionCatalog",
+    catalog: ActionCatalog,
 ) -> str:
     """Find the shortest prefix p where ``service:p*`` is scope-equivalent to ``service:verb*``.
 
@@ -297,7 +297,7 @@ def _try_shorten_across_verbs(
     service: str,
     all_names: list[str],
     items: list[str],
-    catalog: "ActionCatalog",
+    catalog: ActionCatalog,
 ) -> list[str]:
     """Replace verb-level results with shorter catalog-safe prefixes where possible.
 
@@ -332,7 +332,7 @@ def _try_shorten_across_verbs(
                 # Incrementally narrow the LCP instead of recomputing from scratch.
                 new_lcp = os.path.commonprefix([lcp, next_bare])
                 # Stop if lcp vanishes or equals any item's bare prefix (no gain).
-                if not new_lcp or new_lcp == lcp or new_lcp == next_bare:
+                if not new_lcp or new_lcp in (lcp, next_bare):
                     break
                 lcp = new_lcp
                 window.append(sorted_result[j])

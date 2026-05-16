@@ -555,7 +555,8 @@ class TestAggressiveIndividualVerbShortening:
         """
         catalog = self._catalog(
             "svc",
-            ["DeleteFoo", "DeleteBar", "DenyAccess", "DescribeThing", "DelimitedObj", "DelegateRole"],
+            ["DeleteFoo", "DeleteBar", "DenyAccess", "DescribeThing", "DelimitedObj",
+             "DelegateRole"],
         )
         stmt = Statement(
             effect="Deny",
