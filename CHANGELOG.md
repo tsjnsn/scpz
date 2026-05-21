@@ -10,12 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `spec.validation` in `scpz.yaml` with per-rule severities (`error`, `warn`,
   `ignore`) for wildcard actions, broad `Resource: "*"`, missing `Sid`, and
-  unknown service prefixes. The optimizer and `scpz validate` honour these
+  unknown service prefixes. Wildcard actions use `onWildcardAction`: the
+  service-specific part after `:` must contain `*` or `?` to match; the bare
+  action `*` is excluded. The optimizer and `scpz validate` honour these
   settings from the discovered config file.
 - `scpz validate` (and pre-optimize validation) cross-checks literal
   `Action` / `NotAction` strings against the configured AWS action catalog.
   Unknown actions for a catalogued service use `spec.validation.onUnknownCatalogAction`
   (default `warn`; set to `error` for strict mode, or `ignore` to skip).
+
+### Changed
+- `optimize` applies the same validation rules as `validate`, checks the
+  optimized document (and each split shard) before any write, exits non-zero
+  when any issue is elevated to `error`, and skips backups, in-place writes,
+  `--output`, and split file writes in that case.
+- `validate` loads project config per file so it honours `spec.validation`
+  (invalid `scpz.yaml` prints a config error and counts as failure for that
+  path without aborting the whole command).
 
 ## [0.2.7] - 2026-05-16
 
