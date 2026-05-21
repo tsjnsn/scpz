@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import textwrap
 from typing import TYPE_CHECKING
 
-from scpz.config import ValidationConfig
+from scpz.catalog import ActionCatalog
+from scpz.config import SUPPORTED_API_VERSION, SUPPORTED_KIND, ValidationConfig
 from scpz.models import ScpDocument
 from scpz.validator import (
     Severity,
@@ -155,7 +157,177 @@ class TestDocumentValidation:
         assert not err_result.is_valid
 
 
-class TestFileValidation:
+class TestCatalogActionValidation:
+    def test_known_bundled_actions_clean(self, simple_deny: ScpDocument) -> None:
+        cat = ActionCatalog.bundled()
+        result = validate_document(
+            simple_deny,
+            validation=ValidationConfig(),
+            action_catalog=cat,
+        )
+        catalog_msgs = [i for i in result.issues if "not in the AWS action catalog" in i.message]
+        assert catalog_msgs == []
+
+    def test_unknown_action_warns_when_service_is_catalogued(self) -> None:
+        doc = ScpDocument.from_json(
+            '{"Version": "2012-10-17", '
+            '"Statement": [{"Effect": "Deny", "Action": "iam:GetFunctoin", "Resource": "*"}]}'
+        )
+        cat = ActionCatalog.from_dict({"iam": ["GetRole", "GetUser"]})
+        result = validate_document(
+            doc,
+            validation=ValidationConfig(),
+            action_catalog=cat,
+        )
+        assert result.is_valid
+        warns = [i for i in result.warnings if "not in the AWS action catalog" in i.message]
+        assert len(warns) == 1
+
+    def test_unknown_action_errors_in_strict_mode(self) -> None:
+        doc = ScpDocument.from_json(
+            '{"Version": "2012-10-17", '
+            '"Statement": [{"Effect": "Deny", "Action": "iam:GetFunctoin", "Resource": "*"}]}'
+        )
+        cat = ActionCatalog.from_dict({"iam": ["GetRole"]})
+        result = validate_document(
+            doc,
+            validation=ValidationConfig(onUnknownCatalogAction="error"),
+            action_catalog=cat,
+        )
+        assert not result.is_valid
+        errs = [i for i in result.errors if "not in the AWS action catalog" in i.message]
+        assert len(errs) == 1
+
+    def test_wildcard_not_catalog_checked(self) -> None:
+        doc = ScpDocument.from_json(
+            '{"Version": "2012-10-17", '
+            '"Statement": [{"Effect": "Deny", "Action": "iam:Get*", "Resource": "*"}]}'
+        )
+        cat = ActionCatalog.from_dict({"iam": ["GetRole"]})
+        result = validate_document(
+            doc,
+            validation=ValidationConfig(onUnknownCatalogAction="error"),
+            action_catalog=cat,
+        )
+        cat_issues = [i for i in result.issues if "not in the AWS action catalog" in i.message]
+        assert cat_issues == []
+
+    def test_not_action_unknown_warns(self) -> None:
+        doc = ScpDocument.from_json(
+            '{"Version": "2012-10-17", '
+            '"Statement": [{"Effect": "Deny", "NotAction": "s3:GetObjet", "Resource": "*"}]}'
+        )
+        cat = ActionCatalog.from_dict({"s3": ["GetObject"]})
+        result = validate_document(
+            doc,
+            validation=ValidationConfig(),
+            action_catalog=cat,
+        )
+        assert result.is_valid
+        assert any("not in the AWS action catalog" in i.message for i in result.warnings)
+
+    def test_on_unknown_catalog_action_ignore(self) -> None:
+        doc = ScpDocument.from_json(
+            '{"Version": "2012-10-17", '
+            '"Statement": [{"Effect": "Deny", "Action": "iam:GetFunctoin", "Resource": "*"}]}'
+        )
+        cat = ActionCatalog.from_dict({"iam": ["GetRole"]})
+        result = validate_document(
+            doc,
+            validation=ValidationConfig(onUnknownCatalogAction="ignore"),
+            action_catalog=cat,
+        )
+        assert not any("not in the AWS action catalog" in i.message for i in result.issues)
+
+
+class TestValidateFileConfig:
+    def test_invalid_scpz_yaml_returns_no_doc(self, tmp_path: Path) -> None:
+        (tmp_path / "scpz.yaml").write_text("not: [broken", encoding="utf-8")
+        pol = tmp_path / "p.json"
+        pol.write_text(
+            '{"Version":"2012-10-17","Statement":[{"Effect":"Deny","Action":"*","Resource":"*"}]}',
+            encoding="utf-8",
+        )
+        doc, result = validate_file(pol)
+        assert doc is None
+        assert not result.is_valid
+        assert any("Invalid scpz.yaml" in i.message for i in result.errors)
+
+    def test_validate_file_missing_catalog_path(self, tmp_path: Path) -> None:
+        missing = tmp_path / "nope.json"
+        (tmp_path / "scpz.yaml").write_text(
+            textwrap.dedent(
+                f"""
+                apiVersion: {SUPPORTED_API_VERSION}
+                kind: {SUPPORTED_KIND}
+                spec:
+                  catalog:
+                    source: file
+                    path: {missing.as_posix()}
+                """
+            ),
+            encoding="utf-8",
+        )
+        pol = tmp_path / "p.json"
+        pol.write_text(
+            '{"Version":"2012-10-17","Statement":[{"Effect":"Deny","Action":"*","Resource":"*"}]}',
+            encoding="utf-8",
+        )
+        doc, result = validate_file(pol)
+        assert doc is None
+        assert not result.is_valid
+        assert any("Could not load action catalog" in i.message for i in result.errors)
+
+    def test_validate_file_malformed_catalog_json(self, tmp_path: Path) -> None:
+        bad_cat = tmp_path / "bad.json"
+        bad_cat.write_text("{not json", encoding="utf-8")
+        (tmp_path / "scpz.yaml").write_text(
+            textwrap.dedent(
+                f"""
+                apiVersion: {SUPPORTED_API_VERSION}
+                kind: {SUPPORTED_KIND}
+                spec:
+                  catalog:
+                    source: file
+                    path: {bad_cat.as_posix()}
+                """
+            ),
+            encoding="utf-8",
+        )
+        pol = tmp_path / "p.json"
+        pol.write_text(
+            '{"Version":"2012-10-17","Statement":[{"Effect":"Deny","Action":"*","Resource":"*"}]}',
+            encoding="utf-8",
+        )
+        doc, result = validate_file(pol)
+        assert doc is None
+        assert not result.is_valid
+        assert any("Could not load action catalog" in i.message for i in result.errors)
+
+    def test_strict_unknown_action_via_scpz_yaml(self, tmp_path: Path) -> None:
+        (tmp_path / "scpz.yaml").write_text(
+            textwrap.dedent(
+                f"""
+                apiVersion: {SUPPORTED_API_VERSION}
+                kind: {SUPPORTED_KIND}
+                spec:
+                  validation:
+                    onUnknownCatalogAction: error
+                """
+            ),
+            encoding="utf-8",
+        )
+        pol = tmp_path / "p.json"
+        pol.write_text(
+            '{"Version":"2012-10-17","Statement":['
+            '{"Effect":"Deny","Action":"iam:GetRol","Resource":"*"}]}',
+            encoding="utf-8",
+        )
+        doc, result = validate_file(pol)
+        assert doc is not None
+        assert not result.is_valid
+        assert any("not in the AWS action catalog" in i.message for i in result.errors)
+
     def test_validate_file(self, fixtures_dir: Path) -> None:
         doc, result = validate_file(fixtures_dir / "simple_deny.json")
         assert doc is not None

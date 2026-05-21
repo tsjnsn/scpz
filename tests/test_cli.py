@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import textwrap
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
@@ -209,6 +210,38 @@ class TestOptimizeCommand:
 
 
 class TestValidateErrors:
+    def test_bad_scpz_yaml_exits_1(self, tmp_path: Path) -> None:
+        (tmp_path / "scpz.yaml").write_text("not: [broken", encoding="utf-8")
+        pol = tmp_path / "p.json"
+        pol.write_text(
+            '{"Version":"2012-10-17","Statement":[{"Effect":"Deny","Action":"*","Resource":"*"}]}',
+            encoding="utf-8",
+        )
+        result = runner.invoke(app, ["validate", str(pol)])
+        assert result.exit_code == 1
+
+    def test_strict_unknown_action_exits_1(self, tmp_path: Path) -> None:
+        (tmp_path / "scpz.yaml").write_text(
+            textwrap.dedent(
+                """
+                apiVersion: scpz.io/v1alpha1
+                kind: OptimizerConfig
+                spec:
+                  validation:
+                    onUnknownCatalogAction: error
+                """
+            ),
+            encoding="utf-8",
+        )
+        pol = tmp_path / "p.json"
+        pol.write_text(
+            '{"Version":"2012-10-17","Statement":['
+            '{"Effect":"Deny","Action":"iam:GetRol","Resource":"*"}]}',
+            encoding="utf-8",
+        )
+        result = runner.invoke(app, ["validate", str(pol)])
+        assert result.exit_code == 1
+
     def test_empty_dir_exits_1(self, tmp_path: Path) -> None:
         result = runner.invoke(app, ["validate", str(tmp_path)])
         assert result.exit_code == 1

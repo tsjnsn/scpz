@@ -99,6 +99,7 @@ class TestConfigDiscovery:
         optimizer = cfg.spec.optimizer
         # Explicitly set
         assert optimizer.statementMerge is not None
+        assert cfg.spec.validation.onUnknownCatalogAction == "warn"
         assert optimizer.statementMerge.sidOnMerge == "join"
         # Others default to enabled
         assert optimizer.actionCompress is not None
@@ -122,6 +123,7 @@ class TestValidationSpecInConfig:
         assert v.onBroadResource == "warn"
         assert v.onMissingSid == "ignore"
         assert v.onUnknownService == "warn"
+        assert v.onUnknownCatalogAction == "warn"
 
     def test_loads_custom_severities(self, tmp_path: Path) -> None:
         write_config(

@@ -9,7 +9,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from scpz.config import ValidationConfig, ValidationSeverity
+from scpz.catalog import ActionCatalog
+from scpz.config import OptimizerConfig, ValidationConfig, ValidationSeverity
 from scpz.constants import (
     CONDITION_OPERATORS,
     GLOBAL_CONDITION_KEYS,
@@ -90,15 +91,24 @@ def validate_document(
     doc: ScpDocument,
     *,
     validation: ValidationConfig | None = None,
+    action_catalog: ActionCatalog | None = None,
 ) -> ValidationResult:
-    """Run all validation checks on a parsed SCP document."""
+    """Run all validation checks on a parsed SCP document.
+
+    When *action_catalog* is non-empty, literal ``Action`` / ``NotAction`` strings
+    are cross-checked against the catalog. Unknown literals for a catalogued
+    service use ``validation.onUnknownCatalogAction``.
+    """
     result = ValidationResult()
     vcfg = validation if validation is not None else ValidationConfig()
     _check_constraints(doc, result)
+    catalog = (
+        action_catalog if (action_catalog is not None and not action_catalog.is_empty()) else None
+    )
     for idx, stmt in enumerate(doc.statement):
         prefix = f"Statement[{idx}]"
         _check_missing_sid(stmt, prefix, vcfg, result)
-        _check_actions(stmt, prefix, vcfg, result)
+        _check_actions(stmt, prefix, vcfg, result, catalog=catalog)
         _check_conditions(stmt, prefix, result)
         _check_resources(stmt, prefix, vcfg, result)
     return result
@@ -107,13 +117,16 @@ def validate_document(
 def validate_file(
     path: str | Path,
     *,
-    validation: ValidationConfig | None = None,
+    config: OptimizerConfig | None = None,
 ) -> tuple[ScpDocument | None, ValidationResult]:
     """Validate an SCP JSON file end-to-end.
 
-    Returns the parsed document (if parseable) and all validation issues.
+    Loads ``scpz.yaml`` from the file's directory tree (same discovery as
+    ``optimize``) unless *config* is provided. Returns the parsed document (if
+    parseable) and all validation issues.
     """
-    text = Path(path).read_text(encoding="utf-8")
+    p = Path(path)
+    text = p.read_text(encoding="utf-8")
     data, result = validate_json_syntax(text)
     if not result.is_valid:
         return None, result
@@ -125,8 +138,23 @@ def validate_file(
         result.add_error(f"Failed to parse SCP document: {exc}")
         return None, result
 
-    vcfg = validation if validation is not None else ValidationConfig()
-    doc_result = validate_document(doc, validation=vcfg)
+    try:
+        cfg = config if config is not None else OptimizerConfig.load(p)
+    except ValueError as exc:
+        result.add_error(f"Invalid scpz.yaml: {exc}")
+        return None, result
+
+    try:
+        catalog = ActionCatalog.load(cfg.spec.catalog)
+    except (FileNotFoundError, OSError, json.JSONDecodeError, ValueError) as exc:
+        result.add_error(f"Could not load action catalog ({cfg.spec.catalog.source}): {exc}")
+        return None, result
+
+    doc_result = validate_document(
+        doc,
+        validation=cfg.spec.validation,
+        action_catalog=catalog,
+    )
     result.issues.extend(doc_result.issues)
     return doc, result
 
@@ -185,7 +213,12 @@ def _check_constraints(doc: ScpDocument, result: ValidationResult) -> None:
 
 
 def _check_actions(
-    stmt: Statement, prefix: str, vcfg: ValidationConfig, result: ValidationResult
+    stmt: Statement,
+    prefix: str,
+    vcfg: ValidationConfig,
+    result: ValidationResult,
+    *,
+    catalog: ActionCatalog | None,
 ) -> None:
     """Validate action strings."""
     actions = stmt.action_list or stmt.not_action_list
@@ -207,6 +240,13 @@ def _check_actions(
                 path=f"{prefix}.{action_field}[{i}]",
             )
         svc = action.split(":")[0].lower()
+        name_part = action.split(":", 1)[1]
+        if catalog is not None:
+            known = catalog.literal_action_known(svc, name_part)
+            if known is False:
+                msg = f"Unknown action '{action}' (not in the AWS action catalog)"
+                path = f"{prefix}.{action_field}[{i}]"
+                _emit_rule(result, vcfg.onUnknownCatalogAction, msg, path)
         if svc not in SERVICE_PREFIXES:
             _emit_rule(
                 result,

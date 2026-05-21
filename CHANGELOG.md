@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ignore`) for wildcard actions, broad `Resource: "*"`, missing `Sid`, and
   unknown service prefixes. The optimizer and `scpz validate` honour these
   settings from the discovered config file.
+- `scpz validate` (and pre-optimize validation) cross-checks literal
+  `Action` / `NotAction` strings against the configured AWS action catalog.
+  Unknown actions for a catalogued service use `spec.validation.onUnknownCatalogAction`
+  (default `warn`; set to `error` for strict mode, or `ignore` to skip).
 
 ## [0.2.7] - 2026-05-16
 
