@@ -73,6 +73,12 @@ class TestValidateCommand:
         result = runner.invoke(app, ["validate", str(fixtures_dir / "simple_deny.json")])
         assert result.exit_code == 0
 
+    def test_validate_bad_config_exits_1(self, fixtures_dir: Path, tmp_path: Path) -> None:
+        (tmp_path / "scpz.yaml").write_text("apiVersion: bad\nkind: Bad\n", encoding="utf-8")
+        shutil.copy2(fixtures_dir / "simple_deny.json", tmp_path / "policy.json")
+        result = runner.invoke(app, ["validate", str(tmp_path / "policy.json")])
+        assert result.exit_code == 1
+
     def test_validate_directory(self, fixtures_dir: Path) -> None:
         result = runner.invoke(app, ["validate", str(fixtures_dir)])
         # May have warnings but should not fail with errors

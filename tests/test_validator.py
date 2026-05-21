@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from scpz.config import ValidationConfig
 from scpz.models import ScpDocument
 from scpz.validator import (
     Severity,
@@ -71,6 +72,87 @@ class TestDocumentValidation:
         result = validate_document(doc)
         warnings = [i for i in result.issues if "Unknown service prefix" in i.message]
         assert len(warnings) == 1
+
+    def test_on_unknown_service_ignore(self) -> None:
+        doc = ScpDocument.from_json(
+            '{"Version": "2012-10-17", '
+            '"Statement": [{"Sid": "S", "Effect": "Deny", '
+            '"Action": "fakeservice:DoSomething", "Resource": "*"}]}'
+        )
+        vcfg = ValidationConfig(onUnknownService="ignore")
+        result = validate_document(doc, validation=vcfg)
+        assert not any("Unknown service prefix" in i.message for i in result.issues)
+
+    def test_on_unknown_service_error(self) -> None:
+        doc = ScpDocument.from_json(
+            '{"Version": "2012-10-17", '
+            '"Statement": [{"Sid": "S", "Effect": "Deny", '
+            '"Action": "fakeservice:DoSomething", "Resource": "*"}]}'
+        )
+        vcfg = ValidationConfig(onUnknownService="error")
+        result = validate_document(doc, validation=vcfg)
+        assert not result.is_valid
+        assert any("Unknown service prefix" in i.message for i in result.errors)
+
+    def test_on_wildcard_action_in_verb(self) -> None:
+        doc = ScpDocument.from_json(
+            '{"Version": "2012-10-17", '
+            '"Statement": [{"Sid": "S", "Effect": "Deny", '
+            '"Action": "iam:Get*", "Resource": "*"}]}'
+        )
+        result = validate_document(doc)
+        assert any("wildcard" in i.message.lower() for i in result.warnings)
+
+    def test_on_wildcard_action_ignore(self) -> None:
+        doc = ScpDocument.from_json(
+            '{"Version": "2012-10-17", '
+            '"Statement": [{"Sid": "S", "Effect": "Deny", '
+            '"Action": "iam:Get*", "Resource": "*"}]}'
+        )
+        vcfg = ValidationConfig(onWildcardAction="ignore")
+        result = validate_document(doc, validation=vcfg)
+        assert not any("wildcard" in i.message.lower() for i in result.issues)
+
+    def test_bare_star_action_not_wildcard_rule(self) -> None:
+        doc = ScpDocument.from_json(
+            '{"Version": "2012-10-17", '
+            '"Statement": [{"Sid": "S", "Effect": "Deny", '
+            '"Action": "*", "Resource": "*", '
+            '"Condition": {"StringEquals": {"aws:PrincipalAccount": "123"}}}]}'
+        )
+        result = validate_document(doc)
+        assert not any("wildcard" in i.message.lower() for i in result.issues)
+
+    def test_on_broad_resource_warn(self) -> None:
+        doc = ScpDocument.from_json(
+            '{"Version": "2012-10-17", '
+            '"Statement": [{"Sid": "S", "Effect": "Deny", '
+            '"Action": "s3:GetObject", "Resource": "*"}]}'
+        )
+        result = validate_document(doc)
+        assert any("very broad" in i.message for i in result.warnings)
+
+    def test_on_broad_resource_suppressed_when_condition(self) -> None:
+        doc = ScpDocument.from_json(
+            '{"Version": "2012-10-17", '
+            '"Statement": [{"Sid": "S", "Effect": "Deny", '
+            '"Action": "s3:GetObject", "Resource": "*", '
+            '"Condition": {"StringEquals": {"aws:PrincipalAccount": "123"}}}]}'
+        )
+        result = validate_document(doc)
+        assert not any("very broad" in i.message for i in result.issues)
+
+    def test_on_missing_sid_respects_severity(self) -> None:
+        doc = ScpDocument.from_json(
+            '{"Version": "2012-10-17", '
+            '"Statement": [{"Effect": "Deny", '
+            '"Action": "s3:GetObject", "Resource": "arn:aws:s3:::mybucket"}]}'
+        )
+        assert not any("no Sid" in i.message for i in validate_document(doc).issues)
+        warn_result = validate_document(doc, validation=ValidationConfig(onMissingSid="warn"))
+        assert any("no Sid" in i.message for i in warn_result.warnings)
+        err_result = validate_document(doc, validation=ValidationConfig(onMissingSid="error"))
+        assert not err_result.is_valid
 
 
 class TestFileValidation:
