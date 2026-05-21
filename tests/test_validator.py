@@ -157,6 +157,19 @@ class TestDocumentValidation:
         assert not err_result.is_valid
 
 
+class TestValidationRuleSeverities:
+    def test_on_wildcard_action_error(self) -> None:
+        doc = ScpDocument.from_json(
+            '{"Version": "2012-10-17", '
+            '"Statement": [{"Sid": "S", "Effect": "Deny", '
+            '"Action": "iam:Get*", "Resource": "*"}]}'
+        )
+        rules = ValidationConfig(onWildcardAction="error")
+        result = validate_document(doc, validation=rules)
+        assert not result.is_valid
+        assert any("wildcard" in i.message.lower() for i in result.errors)
+
+
 class TestCatalogActionValidation:
     def test_known_bundled_actions_clean(self, simple_deny: ScpDocument) -> None:
         cat = ActionCatalog.bundled()
