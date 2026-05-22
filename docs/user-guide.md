@@ -1,4 +1,3 @@
-!!! note "Source of truth"
-    This page embeds [`README.md`](https://github.com/tsjnsn/scpz/blob/main/README.md) from the repository root. Edit that file to change end-user documentation; the docs site picks it up on the next deploy.
+End-user documentation from [`README.md`](https://github.com/tsjnsn/scpz/blob/main/README.md) (from **AWS SCP Limits** onward).
 
---8<-- "README.md:12:126"
+--8<-- "README.md:14:132"
