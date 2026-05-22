@@ -85,7 +85,7 @@ def _expand_action_patterns_to_atoms(patterns: list[str], catalog: ActionCatalog
         if ":" not in normalized_pattern:
             out.add(normalized_pattern)
             continue
-        service, _, _ = normalized_pattern.partition(":")
+        service = normalized_pattern.partition(":")[0]
         if "*" not in normalized_pattern and "?" not in normalized_pattern:
             out.add(normalized_pattern)
             continue

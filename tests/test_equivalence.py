@@ -170,6 +170,21 @@ class TestCheckPermissionEquivalence:
         expanded = _expand_action_patterns_to_atoms(["s3:GetObject"], catalog)
         assert expanded == {"s3:GetObject"}
 
+    def test_bare_star_loads_catalog_universe_lazily(self) -> None:
+        class CountingCatalog(ActionCatalog):
+            def __init__(self, data: dict[str, frozenset[str]]) -> None:
+                super().__init__(data)
+                self.calls = 0
+
+            def all_full_actions(self) -> frozenset[str]:
+                self.calls += 1
+                return super().all_full_actions()
+
+        catalog = CountingCatalog({"s3": frozenset({"GetObject"})})
+        expanded = _expand_action_patterns_to_atoms(["*"], catalog)
+        assert expanded == {"s3:GetObject"}
+        assert catalog.calls == 1
+
 
 class TestExamplesOptimizedEquivalence:
     @pytest.mark.parametrize(
