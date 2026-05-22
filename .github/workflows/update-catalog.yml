@@ -39,6 +39,7 @@ jobs:
         if: steps.diff.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
+          base: dev-ai
           commit-message: "chore: update AWS action catalog"
           branch: chore/update-aws-catalog
           delete-branch: true

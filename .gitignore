@@ -18,5 +18,8 @@ wheels/
 .coverage
 htmlcov/
 
+# MkDocs
+site/
+
 # scpz optimizer backups (never commit)
 *.bak

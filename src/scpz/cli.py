@@ -136,7 +136,9 @@ def _optimize_file(
     # Optimize
     result = optimize(doc, config=cfg)
 
-    post_val = validate_document(result.optimized, validation=cfg.spec.validation)
+    post_val = validate_document(
+        result.optimized, validation=cfg.spec.validation, action_catalog=result.catalog
+    )
     _print_validation(post_val, file_path)
     if not post_val.is_valid:
         raise typer.Exit(code=1)
@@ -204,7 +206,9 @@ def _handle_split_output(
         suffix = file_path.suffix
         out_name = f"{stem}_{i}{suffix}"
 
-        split_val = validate_document(doc, validation=cfg.spec.validation)
+        split_val = validate_document(
+            doc, validation=cfg.spec.validation, action_catalog=result.catalog
+        )
         _print_validation(split_val, Path(out_name))
         if not split_val.is_valid:
             console.print("[red]Split output failed validation; not writing.[/red]")
@@ -304,12 +308,12 @@ def check_equivalence_cmd(
 
     doc_before, val_b = validate_file(before, config=cfg)
     _print_validation(val_b, before)
-    if doc_before is None:
+    if doc_before is None or not val_b.is_valid:
         raise typer.Exit(code=1)
 
     doc_after, val_a = validate_file(after, config=cfg)
     _print_validation(val_a, after)
-    if doc_after is None:
+    if doc_after is None or not val_a.is_valid:
         raise typer.Exit(code=1)
 
     catalog = ActionCatalog.load(cfg.spec.catalog)
