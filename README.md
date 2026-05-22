@@ -46,13 +46,13 @@ Tagging:
 Example (optimize a policy file in the current directory):
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/tsjnsn/scpz:latest optimize-cmd policy.json
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.io/tsjnsn/scpz:latest optimize-cmd policy.json
 ```
 
 With Podman:
 
 ```bash
-podman run --rm -v "$PWD:/work:z" ghcr.io/tsjnsn/scpz:latest optimize-cmd policy.json
+podman run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work:z" ghcr.io/tsjnsn/scpz:latest optimize-cmd policy.json
 ```
 
 To build locally:

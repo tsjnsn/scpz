@@ -16,7 +16,8 @@ FROM python:3.13-slim-bookworm
 
 WORKDIR /work
 
-RUN useradd --create-home --uid 10001 --non-unique scpz
+RUN useradd --create-home --uid 10001 --non-unique scpz \
+    && chown scpz:scpz /work
 
 COPY --from=builder /dist/*.whl /tmp/
 
