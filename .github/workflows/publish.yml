@@ -52,7 +52,7 @@ jobs:
 
   publish-ghcr:
     name: Publish container to GHCR
-    needs: ci
+    needs: publish
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -94,7 +94,7 @@ jobs:
 
   publish-dockerhub:
     name: Publish container to Docker Hub
-    needs: ci
+    needs: publish
     runs-on: ubuntu-latest
     permissions:
       contents: read
