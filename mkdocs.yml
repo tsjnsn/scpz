@@ -3,7 +3,7 @@ site_description: Documentation for the scpz AWS SCP optimizer CLI.
 site_url: https://tsjnsn.github.io/scpz/
 repo_url: https://github.com/tsjnsn/scpz
 repo_name: tsjnsn/scpz
-edit_uri: edit/main/docs/
+edit_uri: ""
 
 docs_dir: docs
 site_dir: site
