@@ -26,6 +26,11 @@ catalog confirms that every catalog action starting with *prefix* is already
 in the statement (or sub-group).  Without a catalog the LCP heuristic is
 trusted as-is.
 
+``NotAction`` uses the same conservative + ``catalog.covers`` proofs only: a
+wildcard in ``NotAction`` would exempt more IAM actions, so compression runs
+only when a catalog is configured and non-empty (mirroring the Action path
+with catalog).  Aggressive shortening for ``NotAction`` is not supported.
+
 Aggressive mode with catalog: two additional passes run after the verb-level
 wildcards are produced.
 
@@ -69,7 +74,10 @@ def compress_actions(
 ) -> list[Statement]:
     """Apply action wildcard compression to each statement.
 
-    *mode* controls aggressiveness:
+    Statements that use ``NotAction`` are compressed only when *catalog* is
+    non-empty, using conservative rules (same ``catalog.covers`` proofs as
+    ``Action`` with a catalog).  *mode* applies only to ``Action`` and does
+    not enable aggressive passes on ``NotAction``.
 
     conservative
         Trie-based recursive compression.  A wildcard is emitted for any
@@ -89,6 +97,35 @@ def compress_actions(
     return [_compress_statement_actions(s, mode=mode, catalog=catalog) for s in statements]
 
 
+def _compress_not_action_statement(
+    stmt: Statement,
+    *,
+    catalog: ActionCatalog | None,
+) -> Statement:
+    """Compress ``NotAction`` entries when a catalog proves no new exemptions.
+
+    Wildcards in ``NotAction`` exempt *more* actions than explicit entries, so
+    the no-catalog LCP heuristic used for ``Action`` is not applied here.
+    When *catalog* is missing or empty, the statement is returned unchanged.
+    """
+    items = stmt.not_action_list
+    if len(items) <= 1 or items == ["*"]:
+        return stmt
+    if catalog is None or catalog.is_empty():
+        return stmt
+
+    compressed = _compress_action_list(
+        items,
+        mode="conservative",
+        catalog=catalog,
+    )
+    new_not_action: list[str] | str = compressed
+    if len(compressed) == 1:
+        new_not_action = compressed[0]
+
+    return stmt.model_copy(update={"not_action": new_not_action})
+
+
 def _compress_statement_actions(
     stmt: Statement,
     *,
@@ -96,9 +133,8 @@ def _compress_statement_actions(
     catalog: ActionCatalog | None,
 ) -> Statement:
     """Compress actions within a single statement."""
-    # Only compress Action, not NotAction (wildcards in NotAction are risky)
     if stmt.not_action is not None:
-        return stmt
+        return _compress_not_action_statement(stmt, catalog=catalog)
 
     actions = stmt.action_list
     if len(actions) <= 1 or actions == ["*"]:

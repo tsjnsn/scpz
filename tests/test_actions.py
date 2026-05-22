@@ -101,14 +101,13 @@ class TestActionCompression:
         result = compress_actions([stmt])
         assert result[0].action == "s3:GetObject"
 
-    def test_skip_not_action(self) -> None:
+    def test_not_action_without_catalog_unchanged(self) -> None:
         stmt = Statement(
             effect="Deny",
             not_action=["iam:CreateUser", "iam:CreateRole"],
             resource="*",
         )
         result = compress_actions([stmt])
-        # NotAction should not be compressed
         assert result[0].not_action == ["iam:CreateUser", "iam:CreateRole"]
 
     def test_mixed_services_no_broad_wildcard(self) -> None:
@@ -444,12 +443,138 @@ class TestIntraStatementSubsumption:
         assert "s3:PutObject" not in actions
         assert "ec2:RunInstances" in actions  # not covered by any wildcard
 
-    def test_not_action_not_subsumed(self) -> None:
-        """compress_actions skips NotAction statements entirely."""
+    def test_not_action_not_subsumed_without_catalog(self) -> None:
+        """Without a catalog, NotAction lists are left unchanged (no subsumption)."""
         original: list[str] = ["iam:GetRole", "iam:CreateRole"]
         stmt = Statement(effect="Deny", not_action=original, resource="*")
         result = compress_actions([stmt])
         assert result[0].not_action == original
+
+    def test_not_action_redundant_entries_removed_with_catalog(self) -> None:
+        """Broader wildcards in NotAction drop redundant explicit exemptions."""
+        catalog = ActionCatalog.from_dict({"iam": ["GetRole", "GetUser"]})
+        stmt = Statement(
+            effect="Deny",
+            not_action=["iam:Get*", "iam:GetRole"],
+            resource="*",
+        )
+        result = compress_actions([stmt], catalog=catalog)
+        assert result[0].not_action == "iam:Get*"
+
+
+class TestNotActionCatalogCompression:
+    """NotAction uses conservative + catalog.covers only (no aggressive passes)."""
+
+    def _catalog_with(self, svc: str, action_names: list[str]) -> ActionCatalog:
+        return ActionCatalog.from_dict({svc: action_names})
+
+    def test_catalog_enables_verb_wildcard_when_fully_covered(self) -> None:
+        catalog = self._catalog_with("iam", ["DeleteRole", "DeleteUser"])
+        stmt = Statement(
+            effect="Deny",
+            not_action=["iam:DeleteRole", "iam:DeleteUser"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="conservative", catalog=catalog)
+        assert result[0].not_action == "iam:Delete*"
+
+    def test_catalog_suppressed_when_not_fully_covered(self) -> None:
+        catalog = self._catalog_with(
+            "iam",
+            ["DeleteRole", "DeleteUser", "DeletePolicy"],
+        )
+        stmt = Statement(
+            effect="Deny",
+            not_action=["iam:DeleteRole", "iam:DeleteUser"],
+            resource="*",
+        )
+        result = compress_actions([stmt], catalog=catalog)
+        na = result[0].not_action_list
+        assert "iam:Delete*" not in na
+        assert set(na) == {"iam:DeleteRole", "iam:DeleteUser"}
+
+    def test_aggressive_mode_does_not_shorten_not_action(self) -> None:
+        """Global aggressive config still runs NotAction compression conservatively."""
+        catalog = self._catalog_with("svc", ["DeleteFoo", "DeleteBar", "CreateThing"])
+        stmt = Statement(
+            effect="Deny",
+            not_action=["svc:DeleteFoo", "svc:DeleteBar"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        na = result[0].not_action_list
+        assert "svc:D*" not in na
+        assert "svc:Delete*" in na
+
+    def test_aggressive_partial_catalog_not_action_stays_conservative(self) -> None:
+        """Aggressive Action would emit svc:D*; NotAction must not broaden exemptions."""
+        catalog = self._catalog_with(
+            "iam",
+            ["DeleteRole", "DeleteUser", "DeletePolicy"],
+        )
+        stmt = Statement(
+            effect="Deny",
+            not_action=["iam:DeleteRole", "iam:DeleteUser"],
+            resource="*",
+        )
+        result = compress_actions([stmt], mode="aggressive", catalog=catalog)
+        na = result[0].not_action_list
+        assert "iam:D*" not in na
+        assert "iam:Delete*" not in na
+
+    def test_lcp_wildcard_blocked_when_catalog_has_extra_matching_action(self) -> None:
+        catalog = self._catalog_with(
+            "s3",
+            ["DeleteObject", "DeleteObjects", "DeleteObjectTagging"],
+        )
+        stmt = Statement(
+            effect="Deny",
+            not_action=["s3:DeleteObject", "s3:DeleteObjects"],
+            resource="*",
+        )
+        result = compress_actions([stmt], catalog=catalog)
+        na = result[0].not_action_list
+        assert "s3:DeleteObject*" not in na
+        assert set(na) == {"s3:DeleteObject", "s3:DeleteObjects"}
+
+    def test_lcp_wildcard_allowed_when_catalog_confirms_coverage(self) -> None:
+        catalog = self._catalog_with(
+            "s3",
+            ["DeleteObject", "DeleteObjects", "DeleteBucket"],
+        )
+        stmt = Statement(
+            effect="Deny",
+            not_action=["s3:DeleteObject", "s3:DeleteObjects"],
+            resource="*",
+        )
+        result = compress_actions([stmt], catalog=catalog)
+        assert "s3:DeleteObject*" in result[0].not_action_list
+
+    def test_action_and_not_action_in_same_call(self) -> None:
+        """Action may use aggressive shortening while NotAction stays catalog-safe."""
+        catalog = self._catalog_with(
+            "iam",
+            ["DeleteRole", "DeleteUser", "DeletePolicy"],
+        )
+        action_stmt = Statement(
+            effect="Deny",
+            action=["iam:DeleteRole", "iam:DeleteUser"],
+            resource="*",
+        )
+        not_action_stmt = Statement(
+            effect="Deny",
+            not_action=["iam:DeleteRole", "iam:DeleteUser"],
+            resource="*",
+        )
+        result = compress_actions(
+            [action_stmt, not_action_stmt],
+            mode="aggressive",
+            catalog=catalog,
+        )
+        assert "iam:D*" in result[0].action_list
+        na = result[1].not_action_list
+        assert "iam:D*" not in na
+        assert "iam:Delete*" not in na
 
 
 class TestAggressiveIndividualVerbShortening:

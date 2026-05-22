@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from scpz.config import SUPPORTED_API_VERSION, SUPPORTED_KIND, OptimizerConfig
 from scpz.models import ScpDocument, Statement
 from scpz.optimizer import optimize
+from scpz.validator import validate_document
+
+FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
 
 def _make_config(**spec: Any) -> OptimizerConfig:
@@ -130,3 +134,14 @@ class TestCanonicalMinification:
         stmt = result.optimized.statement[0]
         assert isinstance(stmt.action, str)
         assert isinstance(stmt.resource, str)
+
+
+class TestNotActionFixtureOptimize:
+    """Shared NotAction corpus fixture optimizes without validation errors."""
+
+    def test_not_action_allowlist_fixture_stays_valid(self) -> None:
+        path = FIXTURES_DIR / "not_action_allowlist.json"
+        doc = ScpDocument.from_file(str(path))
+        result = optimize(doc)
+        v = validate_document(result.optimized)
+        assert v.is_valid, v.errors
