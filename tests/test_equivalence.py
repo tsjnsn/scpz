@@ -12,7 +12,7 @@ from typer.testing import CliRunner
 from scpz.catalog import ActionCatalog
 from scpz.cli import app
 from scpz.config import OptimizerConfig
-from scpz.equivalence import check_permission_equivalence
+from scpz.equivalence import _expand_action_patterns_to_atoms, check_permission_equivalence
 from scpz.models import ScpDocument, Statement
 from scpz.optimizer import optimize
 
@@ -141,6 +141,34 @@ class TestCheckPermissionEquivalence:
         )
         r = check_permission_equivalence(before, after, _tiny_catalog())
         assert r.ok
+
+    def test_mixed_case_service_prefix_wildcard_expands(self) -> None:
+        before = ScpDocument(
+            version="2012-10-17",
+            statement=[
+                Statement(
+                    effect="Deny",
+                    action=["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+                    resource="*",
+                ),
+            ],
+        )
+        after = ScpDocument(
+            version="2012-10-17",
+            statement=[Statement(effect="Deny", action="S3:*", resource="*")],
+        )
+        r = check_permission_equivalence(before, after, _tiny_catalog())
+        assert r.ok
+
+    def test_explicit_actions_do_not_require_catalog_universe(self) -> None:
+        class CatalogWithoutUniverse(ActionCatalog):
+            def all_full_actions(self) -> frozenset[str]:
+                msg = "catalog universe should not be requested"
+                raise AssertionError(msg)
+
+        catalog = CatalogWithoutUniverse.from_dict({"s3": ["GetObject"]})
+        expanded = _expand_action_patterns_to_atoms(["s3:GetObject"], catalog)
+        assert expanded == {"s3:GetObject"}
 
 
 class TestExamplesOptimizedEquivalence:

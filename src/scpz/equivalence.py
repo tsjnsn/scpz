@@ -59,41 +59,51 @@ def _full_catalog_atoms(catalog: ActionCatalog) -> frozenset[str]:
     return catalog.all_full_actions()
 
 
+def _normalize_action_pattern(pattern: str) -> str:
+    """Normalize action patterns to lowercase service prefixes."""
+    if ":" not in pattern:
+        return pattern
+    service, _, remainder = pattern.partition(":")
+    return f"{service.lower()}:{remainder}"
+
+
 def _expand_action_patterns_to_atoms(patterns: list[str], catalog: ActionCatalog) -> set[str]:
     """Expand ``Action`` / ``NotAction`` patterns to a set of ``svc:name`` atoms."""
     out: set[str] = set()
-    universe = _full_catalog_atoms(catalog)
+    universe: frozenset[str] | None = None
 
     for pattern in patterns:
+        normalized_pattern = _normalize_action_pattern(pattern)
         if pattern == "*":
             if catalog.is_empty():
                 msg = "Expanding bare Action '*' requires a non-empty action catalog."
                 raise ValueError(msg)
+            if universe is None:
+                universe = _full_catalog_atoms(catalog)
             out.update(universe)
             continue
-        if ":" not in pattern:
-            out.add(pattern)
+        if ":" not in normalized_pattern:
+            out.add(normalized_pattern)
             continue
-        service, _, verb_part = pattern.partition(":")
-        svc = service.lower()
-        if "*" not in pattern and "?" not in pattern:
-            out.add(f"{svc}:{verb_part}")
+        service, _, _ = normalized_pattern.partition(":")
+        if "*" not in normalized_pattern and "?" not in normalized_pattern:
+            out.add(normalized_pattern)
             continue
-        known = catalog.get_service(svc)
+        known = catalog.get_service(service)
         if not known:
             # Unknown service — treat pattern as a single opaque atom if exact
-            if "*" not in pattern and "?" not in pattern:
-                out.add(f"{svc}:{verb_part}")
+            if "*" not in normalized_pattern and "?" not in normalized_pattern:
+                out.add(normalized_pattern)
             else:
                 msg = (
-                    f"Cannot expand wildcard action '{pattern}' — service '{svc}' "
+                    f"Cannot expand wildcard action '{pattern}' — service '{service}' "
                     "is absent from the action catalog. Use a bundled or file catalog."
                 )
                 raise ValueError(msg)
             continue
         for name in known:
-            full = f"{svc}:{name}"
-            if _pattern_covers_action(pattern, full):
+            full = f"{service}:{name}"
+            if _pattern_covers_action(normalized_pattern, full):
                 out.add(full)
     return out
 
