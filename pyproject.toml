@@ -31,6 +31,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/tsjnsn/scpz"
+Documentation = "https://tsjnsn.github.io/scpz/"
 Repository = "https://github.com/tsjnsn/scpz"
 Issues = "https://github.com/tsjnsn/scpz/issues"
 Changelog = "https://github.com/tsjnsn/scpz/blob/main/CHANGELOG.md"
@@ -50,6 +51,10 @@ dev = [
     "mypy>=1.15",
     "pre-commit>=4",
     "types-PyYAML>=6",
+]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.6",
 ]
 
 [tool.pytest.ini_options]

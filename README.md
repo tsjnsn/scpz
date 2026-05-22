@@ -6,7 +6,8 @@
 [![Downloads](https://img.shields.io/pypi/dm/scpz)](https://pypi.org/project/scpz/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/tsjnsn/scpz/blob/main/LICENSE)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-0366d6)](https://tsjnsn.github.io/scpz/)
 
 Intelligently optimize AWS Service Control Policy (SCP) JSONs to fit within AWS's strict limits.
 
@@ -32,6 +33,34 @@ Or with [uv](https://docs.astral.sh/uv/) (recommended):
 
 ```bash
 uv tool install scpz
+```
+
+### Container (GitHub Container Registry)
+
+Images are built from this repository’s `Dockerfile` (compatible with Docker and Podman) and published to [GitHub Container Registry](https://github.com/tsjnsn/scpz/pkgs/container/scpz) when a [GitHub Release](https://github.com/tsjnsn/scpz/releases) is published.
+
+Tagging:
+
+- **`ghcr.io/tsjnsn/scpz:<release-tag>`** — always pushed for every published release (for example `v0.2.7`).
+- **`ghcr.io/tsjnsn/scpz:latest`** — updated only for **stable** releases (not GitHub pre-releases).
+
+Example (optimize a policy file in the current directory):
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.io/tsjnsn/scpz:latest optimize-cmd policy.json
+```
+
+With Podman:
+
+```bash
+podman run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work:z" ghcr.io/tsjnsn/scpz:latest optimize-cmd policy.json
+```
+
+To build locally:
+
+```bash
+docker build -t scpz:local .
+docker run --rm scpz:local --version
 ```
 
 ## Usage
