@@ -48,6 +48,8 @@ Images are built from this repository’s `Dockerfile` (compatible with Docker a
 
 Published to [GitHub Container Registry](https://github.com/tsjnsn/scpz/pkgs/container/scpz) as `ghcr.io/tsjnsn/scpz`.
 
+Example (optimize a policy file in the current directory):
+
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.io/tsjnsn/scpz:latest optimize-cmd policy.json
 ```

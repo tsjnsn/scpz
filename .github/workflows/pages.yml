@@ -1,4 +1,4 @@
-# Maintainer setup: .github/docs/pages-setup.md
+# Maintainer setup: docs/pages-setup.md
 name: Deploy documentation
 
 on:

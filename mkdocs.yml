@@ -55,6 +55,7 @@ nav:
   - Agent rules: agents.md
   - Contributing: contributing.md
   - Changelog: changelog.md
+  - GitHub Pages setup: pages-setup.md
 
 extra_css:
   - stylesheets/extra.css
