@@ -10,11 +10,11 @@ Until Pages is enabled, `GET /repos/{owner}/{repo}/pages` returns **404** and de
 2. **Build and deployment** → **Source** → **GitHub Actions** (not “Deploy from a branch”).
 3. Ensure **Settings** → **Actions** → **General** allows workflows (org policy can block this).
 
-The workflow runs on pushes to `main` or `dev-ai` when documentation paths change, and on **workflow_dispatch**.
+The workflow runs on pushes to `main` when documentation paths change, and on **workflow_dispatch** (use the `main` branch). Documentation builds on `dev-ai` are validated by the CI **Documentation site** job; only `main` deploys to the `github-pages` environment.
 
 ## After enabling Pages
 
-1. In **Actions**, re-run **Deploy documentation** or trigger **Run workflow** on `dev-ai` / `main`.
+1. In **Actions**, re-run **Deploy documentation** or trigger **Run workflow** on `main`.
 2. Wait for **Deploy to GitHub Pages** to finish.
 3. Confirm [https://tsjnsn.github.io/scpz/](https://tsjnsn.github.io/scpz/) returns HTTP 200.
 

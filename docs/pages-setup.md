@@ -13,11 +13,11 @@ Until this is done, **no Pages site exists** for the repository. The REST endpoi
 
 Also ensure **Actions** are allowed: **Settings** → **Actions** → **General** → *Actions permissions* should allow workflows to run (org policy can block this).
 
-The workflow (`.github/workflows/pages.yml`) runs on pushes to `main` or `dev-ai` when documentation-related paths change, and on **workflow_dispatch** for manual runs.
+The workflow (`.github/workflows/pages.yml`) runs on pushes to `main` when documentation-related paths change, and on **workflow_dispatch** (use the `main` branch). Documentation builds on `dev-ai` are validated by the CI **Documentation site** job; only `main` deploys to the `github-pages` environment.
 
 ## After enabling Pages
 
-1. In **Actions**, open **Deploy documentation** and **Re-run all jobs** on the latest failed run, or use **Run workflow** on `dev-ai` / `main`.
+1. In **Actions**, open **Deploy documentation** and **Re-run all jobs** on the latest failed run, or use **Run workflow** on `main`.
 2. Wait for the **Deploy to GitHub Pages** job to finish.
 3. Confirm the site responds (HTTP 200):  
    [https://tsjnsn.github.io/scpz/](https://tsjnsn.github.io/scpz/)

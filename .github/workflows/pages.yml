@@ -3,7 +3,7 @@ name: Deploy documentation
 
 on:
   push:
-    branches: [main, dev-ai]
+    branches: [main]
     paths:
       - "docs/**"
       - "mkdocs.yml"
@@ -56,7 +56,7 @@ jobs:
     name: Deploy to GitHub Pages
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev-ai'
+    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
