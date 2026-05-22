@@ -132,6 +132,8 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
+          # Fixed repository (not ${{ secrets.DOCKERHUB_USERNAME }}/scpz): credentials must
+          # belong to an account with push access to tsjnsn/scpz (see README).
           images: tsjnsn/scpz
           tags: |
             type=raw,value=${{ github.event.release.tag_name }}

@@ -39,10 +39,10 @@ uv tool install scpz
 
 Images are built from this repository’s `Dockerfile` (compatible with Docker and Podman) and published when a [GitHub Release](https://github.com/tsjnsn/scpz/releases) is published.
 
-**Tagging (both registries):**
+**Tagging (both registries):** each release tag (for example `v0.3.0`) is always published; `latest` is updated only for **stable** releases (not GitHub pre-releases).
 
-- **`<registry>/scpz:<release-tag>`** — always pushed for every published release (for example `v0.3.0`).
-- **`<registry>/scpz:latest`** — updated only for **stable** releases (not GitHub pre-releases).
+- **`ghcr.io/tsjnsn/scpz:<release-tag>`** and **`ghcr.io/tsjnsn/scpz:latest`** (GHCR)
+- **`tsjnsn/scpz:<release-tag>`** and **`tsjnsn/scpz:latest`** (Docker Hub)
 
 #### GitHub Container Registry
 
@@ -78,14 +78,14 @@ docker run --rm scpz:local --version
 
 #### Maintainer credentials
 
-The [Publish release](https://github.com/tsjnsn/scpz/blob/main/.github/workflows/publish.yml) workflow pushes to GHCR (via `GITHUB_TOKEN`) and Docker Hub (via repository secrets). If `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` are unset, the Docker Hub job skips with a workflow notice instead of failing the release.
+The [Publish release](https://github.com/tsjnsn/scpz/blob/main/.github/workflows/publish.yml) workflow pushes to GHCR (via `GITHUB_TOKEN`) and Docker Hub (via repository secrets). Container jobs run only after PyPI publish succeeds so a failed package release does not leave tagged images for an incomplete release. If `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` are unset, the Docker Hub job skips with a workflow notice instead of failing the release.
 
 | Secret | Purpose |
 | --- | --- |
-| `DOCKERHUB_USERNAME` | Docker Hub user or organization that owns the `scpz` repository (for example `tsjnsn`) |
+| `DOCKERHUB_USERNAME` | Docker Hub account with push access to **`tsjnsn/scpz`** (must be `tsjnsn` today; the workflow image name is fixed, not derived from this secret) |
 | `DOCKERHUB_TOKEN` | Docker Hub [access token](https://docs.docker.com/security/for-admins/access-tokens/) with **Read & Write** scope for that account |
 
-Ensure a repository named `scpz` exists under that Docker Hub account before the first push.
+Ensure the Docker Hub repository **`tsjnsn/scpz`** exists before the first push.
 
 ## Usage
 
