@@ -120,6 +120,14 @@ class ActionCatalog:
             return None
         return action_suffix in known
 
+    def all_full_actions(self) -> frozenset[str]:
+        """Return every ``service:name`` pair in the catalog (lowercase service prefix)."""
+        atoms: set[str] = set()
+        for service, names in self._data.items():
+            for name in names:
+                atoms.add(f"{service}:{name}")
+        return frozenset(atoms)
+
     def covers(
         self,
         service: str,

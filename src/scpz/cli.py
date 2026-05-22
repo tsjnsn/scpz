@@ -14,7 +14,9 @@ from rich.console import Console
 from rich.panel import Panel
 
 from scpz import __version__
+from scpz.catalog import ActionCatalog
 from scpz.config import SUPPORTED_API_VERSION, SUPPORTED_KIND, OptimizerConfig
+from scpz.equivalence import check_permission_equivalence
 from scpz.optimizer import OptimizationResult, optimize
 from scpz.splitter import SplitError, split_if_needed
 from scpz.validator import Severity, ValidationResult, validate_file
@@ -261,6 +263,53 @@ def validate_cmd(
         raise typer.Exit(code=1)
 
     console.print("[green]✓ All files are valid.[/green]")
+
+
+# ── check-equivalence command ───────────────────────────────────────
+
+
+@app.command("check-equivalence")
+def check_equivalence_cmd(
+    before: Path = typer.Argument(..., help="SCP JSON before optimization."),
+    after: Path = typer.Argument(..., help="SCP JSON after optimization."),
+) -> None:
+    """Verify that *after* did not broaden permissions versus *before* (catalog model)."""
+    if not before.is_file():
+        console.print(f"[red]File not found:[/red] {before}")
+        raise typer.Exit(code=1)
+    if not after.is_file():
+        console.print(f"[red]File not found:[/red] {after}")
+        raise typer.Exit(code=1)
+
+    try:
+        cfg = OptimizerConfig.load(before)
+    except ValueError as exc:
+        console.print(f"[red]Config error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    doc_before, val_b = validate_file(before, validation=cfg.spec.validation)
+    _print_validation(val_b, before)
+    if doc_before is None:
+        raise typer.Exit(code=1)
+
+    doc_after, val_a = validate_file(after, validation=cfg.spec.validation)
+    _print_validation(val_a, after)
+    if doc_after is None:
+        raise typer.Exit(code=1)
+
+    catalog = ActionCatalog.load(cfg.spec.catalog)
+    eq = check_permission_equivalence(doc_before, doc_after, catalog)
+    if eq.ok:
+        console.print(
+            "[green]✓ Equivalence OK:[/green] after is same or stricter than before "
+            "(Deny / Allow catalog model)."
+        )
+        raise typer.Exit(code=0)
+
+    console.print("[red]Equivalence check failed.[/red]")
+    for msg in eq.messages:
+        console.print(f"  [red]•[/red] {msg}")
+    raise typer.Exit(code=1)
 
 
 # ── helpers ──────────────────────────────────────────────────────────
