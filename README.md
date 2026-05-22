@@ -35,16 +35,18 @@ Or with [uv](https://docs.astral.sh/uv/) (recommended):
 uv tool install scpz
 ```
 
-### Container (GitHub Container Registry)
+### Container images
 
-Images are built from this repository’s `Dockerfile` (compatible with Docker and Podman) and published to [GitHub Container Registry](https://github.com/tsjnsn/scpz/pkgs/container/scpz) when a [GitHub Release](https://github.com/tsjnsn/scpz/releases) is published.
+Images are built from this repository’s `Dockerfile` (compatible with Docker and Podman) and published when a [GitHub Release](https://github.com/tsjnsn/scpz/releases) is published.
 
-Tagging:
+**Tagging (both registries):**
 
-- **`ghcr.io/tsjnsn/scpz:<release-tag>`** — always pushed for every published release (for example `v0.2.7`).
-- **`ghcr.io/tsjnsn/scpz:latest`** — updated only for **stable** releases (not GitHub pre-releases).
+- **`<registry>/scpz:<release-tag>`** — always pushed for every published release (for example `v0.3.0`).
+- **`<registry>/scpz:latest`** — updated only for **stable** releases (not GitHub pre-releases).
 
-Example (optimize a policy file in the current directory):
+#### GitHub Container Registry
+
+Published to [GitHub Container Registry](https://github.com/tsjnsn/scpz/pkgs/container/scpz) as `ghcr.io/tsjnsn/scpz`.
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.io/tsjnsn/scpz:latest optimize-cmd policy.json
@@ -56,12 +58,34 @@ With Podman:
 podman run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work:z" ghcr.io/tsjnsn/scpz:latest optimize-cmd policy.json
 ```
 
-To build locally:
+#### Docker Hub
+
+Published to [Docker Hub](https://hub.docker.com/r/tsjnsn/scpz) as `tsjnsn/scpz`.
+
+```bash
+# Pin to a release (recommended in production)
+docker pull tsjnsn/scpz:v0.3.0
+
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" tsjnsn/scpz:v0.3.0 optimize-cmd policy.json --dry-run
+```
+
+#### Build locally
 
 ```bash
 docker build -t scpz:local .
 docker run --rm scpz:local --version
 ```
+
+#### Maintainer credentials
+
+The [Publish release](https://github.com/tsjnsn/scpz/blob/main/.github/workflows/publish.yml) workflow pushes to GHCR (via `GITHUB_TOKEN`) and Docker Hub (via repository secrets).
+
+| Secret | Purpose |
+| --- | --- |
+| `DOCKERHUB_USERNAME` | Docker Hub user or organization that owns the `scpz` repository (for example `tsjnsn`) |
+| `DOCKERHUB_TOKEN` | Docker Hub [access token](https://docs.docker.com/security/for-admins/access-tokens/) with **Read & Write** scope for that account |
+
+Ensure a repository named `scpz` exists under that Docker Hub account before the first push.
 
 ## Usage
 
