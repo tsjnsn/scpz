@@ -78,7 +78,7 @@ docker run --rm scpz:local --version
 
 #### Maintainer credentials
 
-The [Publish release](https://github.com/tsjnsn/scpz/blob/dev-ai/.github/workflows/publish.yml) workflow pushes to GHCR (via `GITHUB_TOKEN`) and Docker Hub (via repository secrets).
+The [Publish release](https://github.com/tsjnsn/scpz/blob/main/.github/workflows/publish.yml) workflow pushes to GHCR (via `GITHUB_TOKEN`) and Docker Hub (via repository secrets). If `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` are unset, the Docker Hub job skips with a workflow notice instead of failing the release.
 
 | Secret | Purpose |
 | --- | --- |

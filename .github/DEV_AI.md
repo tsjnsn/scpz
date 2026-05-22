@@ -69,7 +69,7 @@ green before merge.
 
 **Settings → Copilot → Coding agent** (or org policy): enable the agent for `tsjnsn/scpz`.
 
-On PR #16, comment e.g. `@copilot please address the review comments` so it works on the PR
+On the pull request, comment e.g. `@copilot please address the review comments` so it works on the PR
 head branch (`dev-ai`).
 
 ## What not to do
