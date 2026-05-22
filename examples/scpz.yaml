@@ -101,16 +101,14 @@ spec:
       enabled: true
       maxRounds: 5            # maximum number of full-pipeline repetitions
 
-  # ── Validation ─────────────────────────────────────────────────────
-  # Tunes the severity of individual validation checks. Each rule accepts:
-  #   error  - block optimization / validate and exit non-zero
-  #   warn   - print a warning but continue
-  #   ignore - suppress the check entirely
+  # ── Validation (scpz validate / pre-optimize) ──────────────────────
+  # Each rule accepts: error | warn | ignore
   validation:
     onWildcardAction: warn    # Action verb contains * or ? (bare Action "*" excluded)
     onBroadResource: warn     # Resource is "*" with no Condition
     onMissingSid: ignore      # statement has no Sid
     onUnknownService: warn    # unrecognised service prefix in an action string
+    onUnknownCatalogAction: warn   # literal action not listed for a catalogued service
 
   # ── Output ─────────────────────────────────────────────────────────
   output:

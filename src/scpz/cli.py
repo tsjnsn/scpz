@@ -124,7 +124,7 @@ def _optimize_file(
         raise typer.Exit(code=1) from exc
 
     # Validate first
-    doc, val_result = validate_file(file_path, validation=cfg.spec.validation)
+    doc, val_result = validate_file(file_path, config=cfg)
     _print_validation(val_result, file_path)
     if doc is None:
         raise typer.Exit(code=1)
@@ -252,13 +252,7 @@ def validate_cmd(
 
     has_errors = False
     for file_path in files:
-        try:
-            cfg = OptimizerConfig.load(file_path)
-        except ValueError as exc:
-            console.print(f"[red]Config error:[/red] {exc}")
-            has_errors = True
-            continue
-        _, val_result = validate_file(file_path, validation=cfg.spec.validation)
+        _, val_result = validate_file(file_path)
         _print_validation(val_result, file_path)
         if not val_result.is_valid:
             has_errors = True

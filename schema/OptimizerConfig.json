@@ -245,7 +245,7 @@
     },
     "ValidationConfig": {
       "additionalProperties": false,
-      "description": "spec.validation \u2014 per-rule severity for SCP semantic guardrails.\n\nEach rule accepts ``error`` (treated as a validation failure), ``warn``\n(reported but does not fail validation), or ``ignore`` (check suppressed).\n\nWildcard actions are flagged when the service-specific part of an action\n(after ``:``) contains ``*`` or ``?``. The bare action ``*`` is excluded.",
+      "description": "spec.validation \u2014 per-rule severity for SCP semantic guardrails.\n\nEach rule accepts ``error`` (treated as a validation failure), ``warn``\n(reported but does not fail validation), or ``ignore`` (check suppressed).\n\nWildcard actions are flagged when the service-specific part of an action\n(after ``:``) contains ``*`` or ``?``. The bare action ``*`` is excluded.\n\n``onUnknownCatalogAction`` applies when a literal action (no ``*`` / ``?`` in\nthe verb) targets a service that appears in the configured action catalog\nbut the verb is not listed \u2014 useful for catching typos. Wildcards are not\ncatalog-checked. When ``spec.catalog.source`` is ``none`` or the service has\nno rows in that catalog, the check does not apply.",
       "properties": {
         "onWildcardAction": {
           "default": "warn",
@@ -285,6 +285,16 @@
             "ignore"
           ],
           "title": "Onunknownservice",
+          "type": "string"
+        },
+        "onUnknownCatalogAction": {
+          "default": "warn",
+          "enum": [
+            "error",
+            "warn",
+            "ignore"
+          ],
+          "title": "Onunknowncatalogaction",
           "type": "string"
         }
       },

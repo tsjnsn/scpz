@@ -206,3 +206,27 @@ class TestBundledCatalog:
         cfg = CatalogConfig()  # default: source="bundled"
         cat = ActionCatalog.load(cfg)
         assert not cat.is_empty()
+
+
+# ── literal_action_known ───────────────────────────────────────────────────────
+
+
+class TestLiteralActionKnown:
+    def test_returns_true_for_listed_action(self) -> None:
+        cat = _mini_catalog()
+        assert cat.literal_action_known("iam", "GetRole") is True
+
+    def test_returns_false_for_typo_in_catalogued_service(self) -> None:
+        cat = _mini_catalog()
+        assert cat.literal_action_known("iam", "DeleteLaptop") is False
+
+    def test_returns_none_for_wildcard_suffix(self) -> None:
+        cat = _mini_catalog()
+        assert cat.literal_action_known("iam", "Delete*") is None
+
+    def test_returns_none_when_service_not_in_catalog(self) -> None:
+        cat = _mini_catalog()
+        assert cat.literal_action_known("ec2", "RunInstances") is None
+
+    def test_empty_catalog_returns_none(self) -> None:
+        assert ActionCatalog.empty().literal_action_known("iam", "GetRole") is None

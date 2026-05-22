@@ -89,6 +89,37 @@ class ActionCatalog:
         """Return the frozenset of known action names for *service*, or empty."""
         return self._data.get(service, frozenset())
 
+    def literal_action_known(
+        self,
+        service: str,
+        action_suffix: str,
+    ) -> bool | None:
+        """Return whether *action_suffix* is a known literal action for *service*.
+
+        *service* should be lower-case (e.g. ``"iam"``). *action_suffix* is the
+        portion after the colon in ``service:Verb`` (e.g. ``"DeleteRole"``).
+
+        Returns
+        -------
+        ``True``
+            The action appears in this catalog for the service.
+        ``False``
+            The service is catalogued (has at least one known action) but this
+            literal name is not listed — useful for typo detection.
+        ``None``
+            No verdict: empty catalog, *action_suffix* contains a wildcard
+            character (``*`` / ``?``), or the service has no entries in this
+            catalog (cannot validate literals).
+        """
+        if self.is_empty():
+            return None
+        if "*" in action_suffix or "?" in action_suffix:
+            return None
+        known = self.get_service(service)
+        if not known:
+            return None
+        return action_suffix in known
+
     def covers(
         self,
         service: str,

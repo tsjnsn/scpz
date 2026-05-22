@@ -225,6 +225,12 @@ class ValidationConfig(BaseModel):
 
     Wildcard actions are flagged when the service-specific part of an action
     (after ``:``) contains ``*`` or ``?``. The bare action ``*`` is excluded.
+
+    ``onUnknownCatalogAction`` applies when a literal action (no ``*`` / ``?`` in
+    the verb) targets a service that appears in the configured action catalog
+    but the verb is not listed — useful for catching typos. Wildcards are not
+    catalog-checked. When ``spec.catalog.source`` is ``none`` or the service has
+    no rows in that catalog, the check does not apply.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -233,6 +239,7 @@ class ValidationConfig(BaseModel):
     onBroadResource: ValidationSeverity = "warn"
     onMissingSid: ValidationSeverity = "ignore"
     onUnknownService: ValidationSeverity = "warn"
+    onUnknownCatalogAction: ValidationSeverity = "warn"
 
 
 class ConfigSpec(BaseModel):
