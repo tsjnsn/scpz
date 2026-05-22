@@ -24,6 +24,7 @@ machine-checkable best effort aligned with how scpz reasons about actions.
 
 from __future__ import annotations
 
+import fnmatch
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -44,14 +45,12 @@ class EquivalenceResult:
 
 
 def _pattern_covers_action(pattern: str, full_action: str) -> bool:
-    """True when IAM action pattern *pattern* covers concrete action *full_action*."""
-    if pattern == "*":
-        return True
-    if pattern == full_action:
-        return True
-    if pattern.endswith("*"):
-        return full_action.startswith(pattern[:-1])
-    return False
+    """True when IAM action pattern *pattern* covers concrete action *full_action*.
+
+    IAM action matching is case-insensitive and supports ``*`` (any sequence of
+    characters) and ``?`` (any single character) anywhere in the pattern.
+    """
+    return fnmatch.fnmatch(full_action.lower(), pattern.lower())
 
 
 def _full_catalog_atoms(catalog: ActionCatalog) -> frozenset[str]:

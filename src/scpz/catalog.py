@@ -92,10 +92,10 @@ class ActionCatalog:
         return self._data.get(service, frozenset())
 
     def iter_full_actions(self) -> Iterator[str]:
-        """Yield every ``service:name`` string present in this catalog."""
+        """Yield every ``service:name`` string in this catalog (lowercase service prefix)."""
         for service, names in self._data.items():
             for name in names:
-                yield f"{service}:{name}"
+                yield f"{service.lower()}:{name}"
 
     def literal_action_known(
         self,
@@ -133,7 +133,7 @@ class ActionCatalog:
         atoms: set[str] = set()
         for service, names in self._data.items():
             for name in names:
-                atoms.add(f"{service}:{name}")
+                atoms.add(f"{service.lower()}:{name}")
         return frozenset(atoms)
 
     def covers(
