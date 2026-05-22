@@ -214,6 +214,27 @@ class OutputConfig(BaseModel):
     backupSuffix: str = ".bak"
 
 
+ValidationSeverity = Literal["error", "warn", "ignore"]
+
+
+class ValidationConfig(BaseModel):
+    """spec.validation — per-rule severity for SCP semantic guardrails.
+
+    Each rule accepts ``error`` (treated as a validation failure), ``warn``
+    (reported but does not fail validation), or ``ignore`` (check suppressed).
+
+    Wildcard actions are flagged when the service-specific part of an action
+    (after ``:``) contains ``*`` or ``?``. The bare action ``*`` is excluded.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    onWildcardAction: ValidationSeverity = "warn"
+    onBroadResource: ValidationSeverity = "warn"
+    onMissingSid: ValidationSeverity = "ignore"
+    onUnknownService: ValidationSeverity = "warn"
+
+
 class ConfigSpec(BaseModel):
     """The full spec block."""
 
@@ -221,6 +242,7 @@ class ConfigSpec(BaseModel):
 
     catalog: CatalogConfig = Field(default_factory=CatalogConfig)
     optimizer: PassesConfig = Field(default_factory=PassesConfig)
+    validation: ValidationConfig = Field(default_factory=ValidationConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
 
 

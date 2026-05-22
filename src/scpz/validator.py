@@ -9,6 +9,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from scpz.config import ValidationConfig, ValidationSeverity
 from scpz.constants import (
     CONDITION_OPERATORS,
     GLOBAL_CONDITION_KEYS,
@@ -85,19 +86,29 @@ def validate_json_syntax(text: str) -> tuple[dict[str, Any] | None, ValidationRe
     return data, result
 
 
-def validate_document(doc: ScpDocument) -> ValidationResult:
+def validate_document(
+    doc: ScpDocument,
+    *,
+    validation: ValidationConfig | None = None,
+) -> ValidationResult:
     """Run all validation checks on a parsed SCP document."""
     result = ValidationResult()
+    vcfg = validation if validation is not None else ValidationConfig()
     _check_constraints(doc, result)
     for idx, stmt in enumerate(doc.statement):
         prefix = f"Statement[{idx}]"
-        _check_actions(stmt, prefix, result)
+        _check_missing_sid(stmt, prefix, vcfg, result)
+        _check_actions(stmt, prefix, vcfg, result)
         _check_conditions(stmt, prefix, result)
-        _check_resources(stmt, prefix, result)
+        _check_resources(stmt, prefix, vcfg, result)
     return result
 
 
-def validate_file(path: str | Path) -> tuple[ScpDocument | None, ValidationResult]:
+def validate_file(
+    path: str | Path,
+    *,
+    validation: ValidationConfig | None = None,
+) -> tuple[ScpDocument | None, ValidationResult]:
     """Validate an SCP JSON file end-to-end.
 
     Returns the parsed document (if parseable) and all validation issues.
@@ -114,7 +125,8 @@ def validate_file(path: str | Path) -> tuple[ScpDocument | None, ValidationResul
         result.add_error(f"Failed to parse SCP document: {exc}")
         return None, result
 
-    doc_result = validate_document(doc)
+    vcfg = validation if validation is not None else ValidationConfig()
+    doc_result = validate_document(doc, validation=vcfg)
     result.issues.extend(doc_result.issues)
     return doc, result
 
@@ -122,6 +134,42 @@ def validate_file(path: str | Path) -> tuple[ScpDocument | None, ValidationResul
 # ── Internal checks ──────────────────────────────────────────────────
 
 _ACTION_RE = re.compile(r"^[a-zA-Z0-9\-]+:[a-zA-Z0-9\*\?]+$")
+
+
+def _emit_rule(
+    result: ValidationResult,
+    severity: ValidationSeverity,
+    message: str,
+    path: str = "",
+) -> None:
+    if severity == "ignore":
+        return
+    if severity == "error":
+        result.add_error(message, path)
+    else:
+        result.add_warning(message, path)
+
+
+def _action_verb_has_wildcard(action: str) -> bool:
+    """True when the action is not bare ``*`` but the verb part contains ``*`` or ``?``."""
+    if action == "*":
+        return False
+    _svc, sep, verb = action.partition(":")
+    if not sep:
+        return "*" in action or "?" in action
+    return "*" in verb or "?" in verb
+
+
+def _check_missing_sid(
+    stmt: Statement, prefix: str, vcfg: ValidationConfig, result: ValidationResult
+) -> None:
+    if stmt.sid is None:
+        _emit_rule(
+            result,
+            vcfg.onMissingSid,
+            "Statement has no Sid",
+            path=f"{prefix}.Sid",
+        )
 
 
 def _check_constraints(doc: ScpDocument, result: ValidationResult) -> None:
@@ -136,7 +184,9 @@ def _check_constraints(doc: ScpDocument, result: ValidationResult) -> None:
         )
 
 
-def _check_actions(stmt: Statement, prefix: str, result: ValidationResult) -> None:
+def _check_actions(
+    stmt: Statement, prefix: str, vcfg: ValidationConfig, result: ValidationResult
+) -> None:
     """Validate action strings."""
     actions = stmt.action_list or stmt.not_action_list
     action_field = "NotAction" if stmt.not_action is not None else "Action"
@@ -149,9 +199,18 @@ def _check_actions(stmt: Statement, prefix: str, result: ValidationResult) -> No
                 path=f"{prefix}.{action_field}[{i}]",
             )
             continue
+        if stmt.not_action is None and _action_verb_has_wildcard(action):
+            _emit_rule(
+                result,
+                vcfg.onWildcardAction,
+                f"Action '{action}' contains a wildcard in the action name",
+                path=f"{prefix}.{action_field}[{i}]",
+            )
         svc = action.split(":")[0].lower()
         if svc not in SERVICE_PREFIXES:
-            result.add_warning(
+            _emit_rule(
+                result,
+                vcfg.onUnknownService,
                 f"Unknown service prefix '{svc}' in action '{action}'",
                 path=f"{prefix}.{action_field}[{i}]",
             )
@@ -193,8 +252,19 @@ def _check_condition_key(key: str, prefix: str, result: ValidationResult) -> Non
         )
 
 
-def _check_resources(stmt: Statement, prefix: str, result: ValidationResult) -> None:
+def _check_resources(
+    stmt: Statement, prefix: str, vcfg: ValidationConfig, result: ValidationResult
+) -> None:
     """Basic resource validation."""
+    if stmt.condition is None:
+        for i, resource in enumerate(stmt.resource_list):
+            if resource == "*":
+                _emit_rule(
+                    result,
+                    vcfg.onBroadResource,
+                    "Resource '*' with no Condition is very broad",
+                    path=f"{prefix}.Resource[{i}]",
+                )
     for i, resource in enumerate(stmt.resource_list):
         if resource == "*":
             continue

@@ -89,6 +89,9 @@
         "optimizer": {
           "$ref": "#/$defs/PassesConfig"
         },
+        "validation": {
+          "$ref": "#/$defs/ValidationConfig"
+        },
         "output": {
           "$ref": "#/$defs/OutputConfig"
         }
@@ -238,6 +241,54 @@
         }
       },
       "title": "StatementMergeArgs",
+      "type": "object"
+    },
+    "ValidationConfig": {
+      "additionalProperties": false,
+      "description": "spec.validation \u2014 per-rule severity for SCP semantic guardrails.\n\nEach rule accepts ``error`` (treated as a validation failure), ``warn``\n(reported but does not fail validation), or ``ignore`` (check suppressed).\n\nWildcard actions are flagged when the service-specific part of an action\n(after ``:``) contains ``*`` or ``?``. The bare action ``*`` is excluded.",
+      "properties": {
+        "onWildcardAction": {
+          "default": "warn",
+          "enum": [
+            "error",
+            "warn",
+            "ignore"
+          ],
+          "title": "Onwildcardaction",
+          "type": "string"
+        },
+        "onBroadResource": {
+          "default": "warn",
+          "enum": [
+            "error",
+            "warn",
+            "ignore"
+          ],
+          "title": "Onbroadresource",
+          "type": "string"
+        },
+        "onMissingSid": {
+          "default": "ignore",
+          "enum": [
+            "error",
+            "warn",
+            "ignore"
+          ],
+          "title": "Onmissingsid",
+          "type": "string"
+        },
+        "onUnknownService": {
+          "default": "warn",
+          "enum": [
+            "error",
+            "warn",
+            "ignore"
+          ],
+          "title": "Onunknownservice",
+          "type": "string"
+        }
+      },
+      "title": "ValidationConfig",
       "type": "object"
     }
   },

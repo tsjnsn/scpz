@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `spec.validation` in `scpz.yaml` with per-rule severities (`error`, `warn`,
+  `ignore`) for wildcard actions, broad `Resource: "*"`, missing `Sid`, and
+  unknown service prefixes. The optimizer and `scpz validate` honour these
+  settings from the discovered config file.
+
 ## [0.2.7] - 2026-05-16
 
 ### Fixed

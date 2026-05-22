@@ -13,6 +13,7 @@ from scpz.config import (
     OptimizerConfig,
     PassesConfig,
     StatementMergeArgs,
+    ValidationConfig,
 )
 from scpz.models import Statement
 from scpz.optimizations.statements import SidMergeMode, merge_statements
@@ -107,6 +108,54 @@ class TestConfigDiscovery:
         assert optimizer.split.strategy == "auto"
         # output defaults
         assert cfg.spec.output.backupSuffix == ".bak"
+        assert cfg.spec.validation.onMissingSid == "ignore"
+        assert cfg.spec.validation.onUnknownService == "warn"
+
+
+# ── spec.validation ───────────────────────────────────────────────────
+
+
+class TestValidationSpecInConfig:
+    def test_defaults_match_expected_guardrails(self) -> None:
+        v = ValidationConfig()
+        assert v.onWildcardAction == "warn"
+        assert v.onBroadResource == "warn"
+        assert v.onMissingSid == "ignore"
+        assert v.onUnknownService == "warn"
+
+    def test_loads_custom_severities(self, tmp_path: Path) -> None:
+        write_config(
+            tmp_path,
+            f"""
+            apiVersion: {SUPPORTED_API_VERSION}
+            kind: {SUPPORTED_KIND}
+            spec:
+              validation:
+                onWildcardAction: ignore
+                onBroadResource: error
+                onMissingSid: warn
+                onUnknownService: ignore
+            """,
+        )
+        cfg = OptimizerConfig.load(tmp_path / "p.json")
+        assert cfg.spec.validation.onWildcardAction == "ignore"
+        assert cfg.spec.validation.onBroadResource == "error"
+        assert cfg.spec.validation.onMissingSid == "warn"
+        assert cfg.spec.validation.onUnknownService == "ignore"
+
+    def test_unknown_validation_field_raises(self, tmp_path: Path) -> None:
+        write_config(
+            tmp_path,
+            f"""
+            apiVersion: {SUPPORTED_API_VERSION}
+            kind: {SUPPORTED_KIND}
+            spec:
+              validation:
+                onNotARealRule: warn
+            """,
+        )
+        with pytest.raises(ValueError, match=r"Extra inputs are not permitted|onNotARealRule"):
+            OptimizerConfig.load(tmp_path / "p.json")
 
 
 # ── Validation ────────────────────────────────────────────────────────

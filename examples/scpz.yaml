@@ -101,17 +101,16 @@ spec:
       enabled: true
       maxRounds: 5            # maximum number of full-pipeline repetitions
 
-  # ── Validation (planned) ───────────────────────────────────────────
+  # ── Validation ─────────────────────────────────────────────────────
   # Tunes the severity of individual validation checks. Each rule accepts:
-  #   error  - block optimization and exit non-zero
+  #   error  - block optimization / validate and exit non-zero
   #   warn   - print a warning but continue
   #   ignore - suppress the check entirely
-  #
-  # validation:
-  #   onWildcardAction: warn    # fires when Action contains a wildcard (*/?)
-  #   onBroadResource: warn     # fires when Resource is * with no Condition
-  #   onMissingSid: ignore      # fires when a statement has no Sid
-  #   onUnknownService: warn    # fires on unrecognised service prefixes
+  validation:
+    onWildcardAction: warn    # Action verb contains * or ? (bare Action "*" excluded)
+    onBroadResource: warn     # Resource is "*" with no Condition
+    onMissingSid: ignore      # statement has no Sid
+    onUnknownService: warn    # unrecognised service prefix in an action string
 
   # ── Output ─────────────────────────────────────────────────────────
   output:
