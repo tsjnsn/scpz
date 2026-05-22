@@ -2,7 +2,8 @@
 
 ## Project overview
 scpz is a Python CLI tool that optimizes AWS Service Control Policy (SCP) JSON
-files to fit within AWS's strict limits (5,120 bytes, 5 statements per SCP).
+files to fit within AWS Organizations Service Control Policy limits
+(10,240 bytes per SCP, 5 statements per SCP, up to 10 SCPs attached per account or OU).
 
 - **Package manager:** `uv` (never use `pip` directly)
 - **Python:** 3.13+, strict typing enforced via mypy

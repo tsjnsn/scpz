@@ -136,6 +136,37 @@ class TestCanonicalMinification:
         assert isinstance(stmt.resource, str)
 
 
+class TestOptimizerNotActionRedundancy:
+    """End-to-end: redundancy eliminate receives the loaded action catalog."""
+
+    def test_not_action_subsumed_statement_dropped_with_bundled_catalog(self) -> None:
+        cfg = _make_config(
+            catalog={"source": "bundled"},
+            optimizer={
+                "statementMerge": {"enabled": False},
+                "actionCompress": {"enabled": False},
+                "conditionMerge": {"enabled": False},
+                "resourceOptimize": {"enabled": False},
+                "redundancyEliminate": {"enabled": True},
+                "fixpoint": {"enabled": False},
+            },
+        )
+        doc = ScpDocument(
+            version="2012-10-17",
+            statement=[
+                Statement(
+                    effect="Deny",
+                    not_action=["s3:GetObject", "s3:PutObject"],
+                    resource="*",
+                ),
+                Statement(effect="Deny", not_action="s3:GetObject", resource="*"),
+            ],
+        )
+        result = optimize(doc, config=cfg)
+        assert len(result.optimized.statement) == 1
+        assert "redundancy-eliminate" in result.passes_applied
+
+
 class TestNotActionFixtureOptimize:
     """Shared NotAction corpus fixture optimizes without validation errors."""
 

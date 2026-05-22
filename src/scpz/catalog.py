@@ -23,6 +23,8 @@ from pathlib import Path  # noqa: TC003 — used at runtime in from_file()
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from scpz.config import CatalogConfig
 
 # Package-relative path to the bundled catalog file
@@ -89,6 +91,12 @@ class ActionCatalog:
         """Return the frozenset of known action names for *service*, or empty."""
         return self._data.get(service, frozenset())
 
+    def iter_full_actions(self) -> Iterator[str]:
+        """Yield every ``service:name`` string present in this catalog."""
+        for service, names in self._data.items():
+            for name in names:
+                yield f"{service}:{name}"
+
     def literal_action_known(
         self,
         service: str,
@@ -119,6 +127,14 @@ class ActionCatalog:
         if not known:
             return None
         return action_suffix in known
+
+    def all_full_actions(self) -> frozenset[str]:
+        """Return every ``service:name`` pair in the catalog (lowercase service prefix)."""
+        atoms: set[str] = set()
+        for service, names in self._data.items():
+            for name in names:
+                atoms.add(f"{service}:{name}")
+        return frozenset(atoms)
 
     def covers(
         self,
