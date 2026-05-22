@@ -148,8 +148,8 @@ def _not_action_subsumed_by(a: Statement, b: Statement, catalog: ActionCatalog) 
         return False
     if _normalise_resource(a.resource) != _normalise_resource(b.resource):
         return False
-    na_a = a.not_action_list
-    na_b = b.not_action_list
+    na_a = _normalize_action_patterns(a.not_action_list)
+    na_b = _normalize_action_patterns(b.not_action_list)
     for full in catalog.iter_full_actions():
         if _exempted_by_not_action_list(full, na_b) and not _exempted_by_not_action_list(
             full, na_a
@@ -161,10 +161,12 @@ def _not_action_subsumed_by(a: Statement, b: Statement, catalog: ActionCatalog) 
 def _exempted_by_not_action_list(full_action: str, patterns: list[str]) -> bool:
     """True when *full_action* matches any ``NotAction`` exemption *patterns*."""
     normalized_action = _normalize_action_match_term(full_action)
-    normalized_patterns = [_normalize_action_match_term(pattern) for pattern in patterns]
-    return any(
-        fnmatchcase(normalized_action, normalized_pattern) for normalized_pattern in normalized_patterns
-    )
+    return any(fnmatchcase(normalized_action, pattern) for pattern in patterns)
+
+
+def _normalize_action_patterns(patterns: list[str]) -> list[str]:
+    """Normalize IAM action patterns for catalog-backed matching."""
+    return [_normalize_action_match_term(pattern) for pattern in patterns]
 
 
 def _normalize_action_match_term(action: str) -> str:
@@ -177,6 +179,9 @@ def _normalize_action_match_term(action: str) -> str:
 
 def _covers(covering: str, action: str) -> bool:
     """Return True if *covering* covers *action*.
+
+    Used for ``Action`` subsumption checks. Catalog-backed ``NotAction`` checks
+    use glob-style matching against literal catalog actions instead.
 
     ``*``            covers everything.
     ``svc:Verb*``    covers ``svc:VerbFoo``, ``svc:VerbFoo*``, etc.
