@@ -6,7 +6,8 @@
 [![Downloads](https://img.shields.io/pypi/dm/scpz)](https://pypi.org/project/scpz/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/tsjnsn/scpz/blob/main/LICENSE)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-0366d6)](https://tsjnsn.github.io/scpz/)
 
 Intelligently optimize AWS Service Control Policy (SCP) JSONs to fit within AWS's strict limits.
 
