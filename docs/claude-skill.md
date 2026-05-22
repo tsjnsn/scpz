@@ -1,6 +1,6 @@
 # Claude Code skill
 
-[`SKILL.md`](https://github.com/tsjnsn/scpz/blob/main/SKILL.md) at the repo root tells assistants when to suggest scpz. Below is the skill body (YAML front matter omitted).
+[`SKILL.md`](https://github.com/tsjnsn/scpz/blob/main/SKILL.md) at the repo root tells assistants when to suggest scpz. Below is the skill body (YAML front matter and title heading omitted).
 
 --8<-- "SKILL.md:15:158"
 
