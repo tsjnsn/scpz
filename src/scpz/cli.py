@@ -88,7 +88,7 @@ def optimize(
     summary_only: bool = typer.Option(
         False,
         "--summary-only",
-        help="Print optimization summary only (no diff).",
+        help="Print optimization summary only; do not write files (no diff).",
     ),
     no_split: bool = typer.Option(
         False,
@@ -111,12 +111,14 @@ def optimize(
     exit_code = 0
     for file_path in files:
         file_output = output
+        split_output_dir = output
         if len(files) > 1 and output is not None:
             file_output = output / file_path.name
         try:
             _optimize_file(
                 file_path,
                 output=file_output,
+                split_output_dir=split_output_dir,
                 dry_run=dry_run,
                 summary_only=summary_only,
                 no_split=no_split,
@@ -136,6 +138,7 @@ def _optimize_file(
     file_path: Path,
     *,
     output: Path | None,
+    split_output_dir: Path | None = None,
     dry_run: bool,
     summary_only: bool,
     no_split: bool,
@@ -184,7 +187,7 @@ def _optimize_file(
                 file_path,
                 result,
                 split_result.documents,
-                output=output,
+                output_dir=split_output_dir if split_output_dir is not None else output,
                 dry_run=dry_run,
                 summary_only=summary_only,
                 cfg=cfg,
@@ -217,7 +220,7 @@ def _handle_split_output(
     result: OptimizationResult,
     documents: list[ScpDocument],
     *,
-    output: Path | None,
+    output_dir: Path | None,
     dry_run: bool,
     summary_only: bool,
     cfg: OptimizerConfig,
@@ -227,7 +230,7 @@ def _handle_split_output(
     _print_summary(result, file_path)
 
     if not dry_run and not summary_only:
-        out_dir = _resolve_split_output_dir(output, file_path)
+        out_dir = _resolve_split_output_dir(output_dir, file_path)
     else:
         out_dir = None
 
@@ -386,19 +389,22 @@ def _resolve_files(path: Path) -> list[Path]:
     return []
 
 
-def _output_path_kind(path: Path) -> str:
-    """Classify an --output path as ``file`` or ``directory``."""
-    if path.exists():
-        return "directory" if path.is_dir() else "file"
-    if path.suffix.lower() == ".json":
-        return "file"
-    return "directory"
+def _is_existing_directory(path: Path) -> bool:
+    return path.exists() and path.is_dir()
+
+
+def _is_existing_file(path: Path) -> bool:
+    return path.exists() and path.is_file()
+
+
+def _looks_like_new_file_path(path: Path) -> bool:
+    """True when a non-existent path clearly names a single output file."""
+    return not path.exists() and path.suffix.lower() == ".json"
 
 
 def _require_output_directory(output: Path, *, reason: str) -> None:
     """Require --output to be a directory (create parents as needed)."""
-    kind = _output_path_kind(output)
-    if kind == "file":
+    if _is_existing_file(output) or _looks_like_new_file_path(output):
         console.print(f"[red]Error:[/red] --output must be a directory when {reason}.")
         raise typer.Exit(code=1)
     output.mkdir(parents=True, exist_ok=True)
@@ -406,7 +412,7 @@ def _require_output_directory(output: Path, *, reason: str) -> None:
 
 def _reject_output_directory_for_single_file(output: Path) -> None:
     """Reject --output when it names a directory but only one SCP will be written."""
-    if _output_path_kind(output) == "directory":
+    if _is_existing_directory(output):
         console.print(
             "[red]Error:[/red] --output must be a file path when writing a single optimized SCP."
         )
@@ -417,8 +423,7 @@ def _resolve_split_output_dir(output: Path | None, file_path: Path) -> Path:
     """Resolve the directory for split SCP output files."""
     if output is None:
         return file_path.parent
-    kind = _output_path_kind(output)
-    if kind == "file":
+    if _is_existing_file(output) or _looks_like_new_file_path(output):
         console.print(
             "[red]Error:[/red] --output must be a directory when splitting into multiple SCPs."
         )
