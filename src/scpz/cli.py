@@ -287,12 +287,12 @@ def check_equivalence_cmd(
         console.print(f"[red]Config error:[/red] {exc}")
         raise typer.Exit(code=1) from exc
 
-    doc_before, val_b = validate_file(before, validation=cfg.spec.validation)
+    doc_before, val_b = validate_file(before, config=cfg)
     _print_validation(val_b, before)
     if doc_before is None:
         raise typer.Exit(code=1)
 
-    doc_after, val_a = validate_file(after, validation=cfg.spec.validation)
+    doc_after, val_a = validate_file(after, config=cfg)
     _print_validation(val_a, after)
     if doc_after is None:
         raise typer.Exit(code=1)
