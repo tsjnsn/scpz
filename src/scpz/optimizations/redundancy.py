@@ -151,16 +151,16 @@ def _not_action_subsumed_by(a: Statement, b: Statement, catalog: ActionCatalog) 
     na_a = _normalize_action_patterns(a.not_action_list)
     na_b = _normalize_action_patterns(b.not_action_list)
     for full in catalog.iter_full_actions():
-        if _exempted_by_not_action_list(full, na_b) and not _exempted_by_not_action_list(
-            full, na_a
+        normalized_full = _normalize_action_match_term(full)
+        if _matches_not_action_patterns(normalized_full, na_b) and not _matches_not_action_patterns(
+            normalized_full, na_a
         ):
             return False
     return True
 
 
-def _exempted_by_not_action_list(full_action: str, patterns: list[str]) -> bool:
-    """True when *full_action* matches any ``NotAction`` exemption *patterns*."""
-    normalized_action = _normalize_action_match_term(full_action)
+def _matches_not_action_patterns(normalized_action: str, patterns: list[str]) -> bool:
+    """True when a normalized catalog action matches any normalized patterns."""
     for pattern in patterns:
         if fnmatchcase(normalized_action, pattern):
             return True
@@ -181,7 +181,7 @@ def _normalize_action_match_term(action: str) -> str:
     ``*`` or malformed inputs) are returned unchanged so this helper only
     rewrites well-formed ``service:name`` patterns.
     """
-    if action == "*" or ":" not in action:
+    if ":" not in action:
         return action
     service, _, name = action.partition(":")
     return f"{service.lower()}:{name}"
