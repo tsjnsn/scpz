@@ -28,6 +28,7 @@ class OptimizationResult:
 
     original: ScpDocument
     optimized: ScpDocument
+    catalog: ActionCatalog
     passes_applied: list[str] = field(default_factory=list)
 
     @property
@@ -119,6 +120,7 @@ def optimize(
     return OptimizationResult(
         original=doc,
         optimized=optimized,
+        catalog=catalog,
         passes_applied=passes_applied,
     )
 
