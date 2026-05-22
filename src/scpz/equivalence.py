@@ -60,7 +60,7 @@ def _full_catalog_atoms(catalog: ActionCatalog) -> frozenset[str]:
 
 
 def _normalize_action_pattern(pattern: str) -> str:
-    """Normalize action patterns to lowercase service prefixes."""
+    """Normalize action patterns by lowercasing only the service prefix."""
     if ":" not in pattern:
         return pattern
     service, _, remainder = pattern.partition(":")

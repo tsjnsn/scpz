@@ -161,17 +161,17 @@ class TestCheckPermissionEquivalence:
         assert r.ok
 
     def test_explicit_actions_do_not_require_catalog_universe(self) -> None:
-        class CatalogWithoutUniverse(ActionCatalog):
+        class CatalogThatFailsOnUniverseRequest(ActionCatalog):
             def all_full_actions(self) -> frozenset[str]:
                 msg = "catalog universe should not be requested"
                 raise AssertionError(msg)
 
-        catalog = CatalogWithoutUniverse.from_dict({"s3": ["GetObject"]})
+        catalog = CatalogThatFailsOnUniverseRequest.from_dict({"s3": ["GetObject"]})
         expanded = _expand_action_patterns_to_atoms(["s3:GetObject"], catalog)
         assert expanded == {"s3:GetObject"}
 
     def test_bare_star_loads_catalog_universe_lazily(self) -> None:
-        class CountingCatalog(ActionCatalog):
+        class UniverseCallCountingCatalog(ActionCatalog):
             def __init__(self, data: dict[str, frozenset[str]]) -> None:
                 super().__init__(data)
                 self.calls = 0
@@ -180,7 +180,7 @@ class TestCheckPermissionEquivalence:
                 self.calls += 1
                 return super().all_full_actions()
 
-        catalog = CountingCatalog({"s3": frozenset({"GetObject"})})
+        catalog = UniverseCallCountingCatalog({"s3": frozenset({"GetObject"})})
         expanded = _expand_action_patterns_to_atoms(["*"], catalog)
         assert expanded == {"s3:GetObject"}
         assert catalog.calls == 1
