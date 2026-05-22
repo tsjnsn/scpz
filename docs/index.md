@@ -1,26 +1,19 @@
 # scpz documentation
 
-**scpz** is a correctness-minded Python CLI that optimizes AWS Service Control Policy (SCP) JSON so it fits AWS Organizations limits: **10,240 bytes** per policy, **5 statements** per SCP, and up to **10 SCPs** per account or OU.
+**scpz** optimizes AWS Service Control Policy (SCP) JSON to fit Organizations limits: **10,240 bytes** per policy, **5 statements** per SCP, and up to **10 SCPs** per account or OU.
 
-## Explore
+## On this site
 
-| Section | What you will find |
-|:--------|:-------------------|
-| [User guide](user-guide.md) | Install, commands, optimization passes, and configuration (from the project README). |
-| [Claude skill](claude-skill.md) | How AI assistants discover scpz via `SKILL.md`, plus links to automation skills. |
-| [Agent rules](agents.md) | Contributor and automation expectations (`AGENTS.md`). |
-| [Contributing](contributing.md) | Local setup, checks, and pull request expectations. |
-| [Changelog](changelog.md) | Release history. |
+| Page | Contents |
+|:-----|:---------|
+| [User guide](user-guide.md) | Install, CLI usage, passes, and configuration |
+| [Claude skill](claude-skill.md) | `SKILL.md` for AI assistants |
+| [Agent rules](agents.md) | Contributor and agent expectations |
+| [Contributing](contributing.md) | Local setup, checks, and pull requests |
+| [Changelog](changelog.md) | Release history |
 
-Use the **search bar** in the header to jump to any heading or phrase across these pages.
+Use the header **search** to jump to any heading.
 
-## Quick links
+## Links
 
-- [Repository](https://github.com/tsjnsn/scpz)
-- [Issues](https://github.com/tsjnsn/scpz/issues)
-- [PyPI package](https://pypi.org/project/scpz/)
-- [CI status](https://github.com/tsjnsn/scpz/actions/workflows/ci.yml)
-
-## Maintainer note
-
-If the site does not update after a merge, confirm [GitHub Pages is set to deploy from Actions](pages-setup.md).
+[Repository](https://github.com/tsjnsn/scpz) · [Issues](https://github.com/tsjnsn/scpz/issues) · [PyPI](https://pypi.org/project/scpz/) · [CI](https://github.com/tsjnsn/scpz/actions/workflows/ci.yml)

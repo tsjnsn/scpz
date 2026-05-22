@@ -1,4 +1,5 @@
-!!! note "Source of truth"
-    This page embeds [`README.md`](https://github.com/tsjnsn/scpz/blob/main/README.md) from the repository root. Edit that file to change end-user documentation; the docs site picks it up on the next deploy.
+# User guide
+
+Embedded from [`README.md`](https://github.com/tsjnsn/scpz/blob/main/README.md). Edit that file for end-user documentation.
 
 --8<-- "README.md:12:126"
