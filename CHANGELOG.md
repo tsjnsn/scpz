@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- CI job **Equivalence golden regression** runs `tests/test_golden_regression.py`:
+  every `examples/*.json` and the NotAction fixtures in that module are
+  optimized then checked with `check_permission_equivalence` so merges block on
+  accidental permission broadening.
 - `scpz check-equivalence before.json after.json` — catalog-backed check that
   the optimized (or other) policy did not broaden permissions versus a
   baseline: ``Deny`` coverage must not shrink and ``Allow`` carve-outs must not
