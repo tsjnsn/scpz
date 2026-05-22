@@ -6,7 +6,7 @@ import difflib
 import json
 import shutil
 import sys
-from pathlib import Path  # noqa: TC003  # required at runtime by Typer
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import typer
@@ -19,7 +19,7 @@ from scpz.config import SUPPORTED_API_VERSION, SUPPORTED_KIND, OptimizerConfig
 from scpz.equivalence import check_permission_equivalence
 from scpz.optimizer import OptimizationResult, optimize
 from scpz.splitter import SplitError, split_if_needed
-from scpz.validator import Severity, ValidationResult, validate_file
+from scpz.validator import Severity, ValidationResult, validate_document, validate_file
 
 if TYPE_CHECKING:
     from scpz.models import ScpDocument
@@ -130,9 +130,16 @@ def _optimize_file(
     _print_validation(val_result, file_path)
     if doc is None:
         raise typer.Exit(code=1)
+    if not val_result.is_valid:
+        raise typer.Exit(code=1)
 
     # Optimize
     result = optimize(doc, config=cfg)
+
+    post_val = validate_document(result.optimized, validation=cfg.spec.validation)
+    _print_validation(post_val, file_path)
+    if not post_val.is_valid:
+        raise typer.Exit(code=1)
 
     # --no-split CLI flag overrides config; otherwise honour split pass config
     split_enabled = (
@@ -155,6 +162,7 @@ def _optimize_file(
                 output=output,
                 dry_run=dry_run,
                 summary_only=summary_only,
+                cfg=cfg,
             )
             return
     elif not result.fits_single_scp and not split_enabled:
@@ -185,6 +193,7 @@ def _handle_split_output(
     output: Path | None,
     dry_run: bool,
     summary_only: bool,
+    cfg: OptimizerConfig,
 ) -> None:
     """Handle output when policy is split into multiple files."""
     console.print(f"[yellow]⚠ Splitting {file_path.name} into {len(documents)} SCPs[/yellow]")
@@ -194,6 +203,12 @@ def _handle_split_output(
         stem = file_path.stem
         suffix = file_path.suffix
         out_name = f"{stem}_{i}{suffix}"
+
+        split_val = validate_document(doc, validation=cfg.spec.validation)
+        _print_validation(split_val, Path(out_name))
+        if not split_val.is_valid:
+            console.print("[red]Split output failed validation; not writing.[/red]")
+            raise typer.Exit(code=1)
 
         if dry_run or summary_only:
             console.print(

@@ -105,6 +105,110 @@ class TestSchemaCommand:
         assert json.loads(out.read_text()).get("title") == "OptimizerConfig"
 
 
+def _scpz_yaml_with_validation(**validation: str) -> str:
+    lines = [
+        "apiVersion: scpz.io/v1alpha1",
+        "kind: OptimizerConfig",
+        "metadata:",
+        "  name: test",
+        "spec:",
+        "  validation:",
+    ]
+    for key, value in validation.items():
+        lines.append(f"    {key}: {value}")
+    return "\n".join(lines) + "\n"
+
+
+class TestOptimizeValidationSeverity:
+    """Optimize honours spec.validation severities (same semantics as validate)."""
+
+    def test_on_wildcard_action_error_exits_nonzero_no_backup(self, tmp_path: Path) -> None:
+        (tmp_path / "scpz.yaml").write_text(
+            _scpz_yaml_with_validation(onWildcardAction="error"),
+            encoding="utf-8",
+        )
+        policy = tmp_path / "policy.json"
+        policy.write_text(
+            json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "X",
+                            "Effect": "Deny",
+                            "Action": "iam:Get*",
+                            "Resource": "*",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        before = policy.read_text()
+
+        result = runner.invoke(app, ["optimize-cmd", str(policy)])
+        assert result.exit_code == 1
+        assert not (tmp_path / "policy.json.bak").exists()
+        assert policy.read_text() == before
+
+    def test_on_wildcard_action_warn_allows_optimize(self, tmp_path: Path) -> None:
+        (tmp_path / "scpz.yaml").write_text(
+            _scpz_yaml_with_validation(onWildcardAction="warn"),
+            encoding="utf-8",
+        )
+        policy = tmp_path / "policy.json"
+        policy.write_text(
+            json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "X",
+                            "Effect": "Deny",
+                            "Action": "iam:Get*",
+                            "Resource": "*",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(app, ["optimize-cmd", str(policy)])
+        assert result.exit_code == 0
+        assert (tmp_path / "policy.json.bak").exists()
+
+    def test_validation_error_skips_explicit_output(self, tmp_path: Path) -> None:
+        (tmp_path / "scpz.yaml").write_text(
+            _scpz_yaml_with_validation(onWildcardAction="error"),
+            encoding="utf-8",
+        )
+        policy = tmp_path / "policy.json"
+        policy.write_text(
+            json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "X",
+                            "Effect": "Deny",
+                            "Action": "s3:Get*",
+                            "Resource": "*",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        out = tmp_path / "optimized.json"
+        result = runner.invoke(
+            app,
+            ["optimize-cmd", str(policy), "--output", str(out)],
+        )
+        assert result.exit_code == 1
+        assert not out.exists()
+
+
 class TestOptimizeErrors:
     def test_empty_dir_exits_1(self, tmp_path: Path) -> None:
         result = runner.invoke(app, ["optimize-cmd", str(tmp_path)])
