@@ -91,6 +91,26 @@ jobs:
           uv run scpz schema | diff - schema/OptimizerConfig.json || \
             (echo "schema/OptimizerConfig.json is out of date. Run: scpz schema -o schema/OptimizerConfig.json" && exit 1)
 
+  docs:
+    name: Documentation site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install docs dependencies
+        run: uv sync --group docs
+
+      - name: Build MkDocs site
+        run: uv run mkdocs build --strict
+
   equivalence-golden:
     name: Equivalence golden regression
     runs-on: ubuntu-latest
