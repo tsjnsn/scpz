@@ -91,6 +91,26 @@ jobs:
           uv run scpz schema | diff - schema/OptimizerConfig.json || \
             (echo "schema/OptimizerConfig.json is out of date. Run: scpz schema -o schema/OptimizerConfig.json" && exit 1)
 
+  docs:
+    name: Documentation site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install docs dependencies
+        run: uv sync --group docs
+
+      - name: Build MkDocs site
+        run: uv run mkdocs build --strict
+
   equivalence-golden:
     name: Equivalence golden regression
     runs-on: ubuntu-latest
@@ -110,3 +130,25 @@ jobs:
 
       - name: Run optimize + equivalence golden tests
         run: uv run pytest tests/test_golden_regression.py -v
+
+  container:
+    name: Container image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (CI)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: scpz:ci
+
+      - name: Smoke test CLI in container
+        run: |
+          docker run --rm scpz:ci --version
+          docker run --rm scpz:ci optimize-cmd --help > /dev/null

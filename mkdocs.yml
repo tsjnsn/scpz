@@ -1,0 +1,61 @@
+site_name: scpz
+site_description: Documentation for the scpz AWS SCP optimizer CLI.
+site_url: https://tsjnsn.github.io/scpz/
+repo_url: https://github.com/tsjnsn/scpz
+repo_name: tsjnsn/scpz
+edit_uri: ""
+
+docs_dir: docs
+site_dir: site
+
+strict: true
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: white
+      accent: blue grey
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: blue grey
+  font:
+    text: system-ui
+    code: ui-monospace
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.expand
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - User guide: user-guide.md
+  - Claude skill: claude-skill.md
+  - Agent rules: agents.md
+  - Contributing: contributing.md
+  - Changelog: changelog.md
+  - GitHub Pages setup: pages-setup.md
+
+extra_css:
+  - stylesheets/extra.css
