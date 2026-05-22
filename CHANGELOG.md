@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-22
+
 ### Changed
 
 - **CLI redesign (breaking):** flat verb-first commands with hyphenated multi-word names.
@@ -21,10 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Public documentation site built with MkDocs Material, deployed to GitHub Pages via `.github/workflows/pages.yml` (enable **Settings → Pages → GitHub Actions** on first use).
 - Official **Docker Hub** image `tsjnsn/scpz`: release workflow pushes tags on
   each GitHub release (`<release tag>` plus `latest` for stable releases).
-
-## [0.3.0] - 2026-05-22
-
-### Added
 - CI job **Equivalence golden regression** runs `tests/test_golden_regression.py`:
   every `examples/*.json` and the NotAction fixtures in that module are
   optimized then checked with `check_permission_equivalence` so merges block on

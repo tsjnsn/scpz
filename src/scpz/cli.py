@@ -229,10 +229,10 @@ def _handle_split_output(
     console.print(f"[yellow]⚠ Splitting {file_path.name} into {len(documents)} SCPs[/yellow]")
     _print_summary(result, file_path)
 
-    if not dry_run and not summary_only:
-        out_dir = _resolve_split_output_dir(output_dir, file_path)
-    else:
-        out_dir = None
+    write_output = not dry_run and not summary_only
+    split_out_dir: Path | None = None
+    if write_output:
+        split_out_dir = _resolve_split_output_dir(output_dir, file_path)
 
     for i, doc in enumerate(documents, 1):
         stem = file_path.stem
@@ -247,17 +247,20 @@ def _handle_split_output(
             console.print("[red]Split output failed validation; not writing.[/red]")
             raise typer.Exit(code=1)
 
-        if dry_run or summary_only:
+        if not write_output:
             console.print(
                 f"  → {out_name}: {doc.size_bytes:,} bytes, {len(doc.statement)} statements"
             )
             if dry_run and not summary_only:
                 _print_diff("", doc.to_json(), out_name)
-        else:
-            assert out_dir is not None
-            out_path = out_dir / out_name
-            out_path.write_text(doc.to_json() + "\n", encoding="utf-8")
-            console.print(f"  → wrote {out_path}")
+            continue
+
+        if split_out_dir is None:
+            console.print("[red]Error:[/red] Split output directory is missing.")
+            raise typer.Exit(code=1)
+        out_path = split_out_dir / out_name
+        out_path.write_text(doc.to_json() + "\n", encoding="utf-8")
+        console.print(f"  → wrote {out_path}")
 
 
 # ── print-schema ─────────────────────────────────────────────────────
