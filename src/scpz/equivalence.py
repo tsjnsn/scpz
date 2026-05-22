@@ -74,7 +74,7 @@ def _expand_action_patterns_to_atoms(patterns: list[str], catalog: ActionCatalog
 
     for pattern in patterns:
         normalized_pattern = _normalize_action_pattern(pattern)
-        if pattern == "*":
+        if normalized_pattern == "*":
             if catalog.is_empty():
                 msg = "Expanding bare Action '*' requires a non-empty action catalog."
                 raise ValueError(msg)
@@ -96,7 +96,7 @@ def _expand_action_patterns_to_atoms(patterns: list[str], catalog: ActionCatalog
                 out.add(normalized_pattern)
             else:
                 msg = (
-                    f"Cannot expand wildcard action '{pattern}' — service '{service}' "
+                    f"Cannot expand wildcard action '{normalized_pattern}' — service '{service}' "
                     "is absent from the action catalog. Use a bundled or file catalog."
                 )
                 raise ValueError(msg)
