@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-22
+
 ### Added
 - CI job **Equivalence golden regression** runs `tests/test_golden_regression.py`:
   every `examples/*.json` and the NotAction fixtures in that module are
@@ -34,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Action` / `NotAction` strings against the configured AWS action catalog.
   Unknown actions for a catalogued service use `spec.validation.onUnknownCatalogAction`
   (default `warn`; set to `error` for strict mode, or `ignore` to skip).
+- `actionCompress` applies catalog-safe wildcard compression to ``NotAction``
+  lists when a non-empty action catalog is configured (same conservative trie
+  and ``catalog.covers`` proofs as ``Action``; aggressive shortening is not
+  used for ``NotAction`` because wildcards would exempt additional APIs).
 
 ### Changed
 - `optimize` applies the same validation rules as `validate`, checks the
@@ -108,7 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dry-run and summary-only modes
 - Rich terminal output with diffs and optimization summaries
 
-[Unreleased]: https://github.com/tsjnsn/scpz/compare/v0.2.7...HEAD
+[Unreleased]: https://github.com/tsjnsn/scpz/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/tsjnsn/scpz/compare/v0.2.7...v0.3.0
 [0.2.7]: https://github.com/tsjnsn/scpz/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/tsjnsn/scpz/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/tsjnsn/scpz/compare/v0.2.3...v0.2.5
