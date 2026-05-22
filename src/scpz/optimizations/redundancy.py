@@ -75,10 +75,10 @@ def eliminate_redundancy(
 ) -> list[Statement]:
     """Remove statements wholly subsumed by another statement in *statements*.
 
-    Runs in O(n²) over the statement list for ``Action`` statements. With a
+    Runs in O(n^2) over the statement list for ``Action`` statements. With a
     non-empty *catalog*, each ``NotAction``-pair comparison also scans the
     catalog and the pair's exemption patterns, so the worst case becomes
-    O(n² × c × p), where *c* is the number of catalog actions and *p* is
+    O(n^2 x c x p), where *c* is the number of catalog actions and *p* is
     ``max(len(a.not_action_list), len(b.not_action_list))`` for the compared
     pair. This remains acceptable given the AWS limit of 5 statements per SCP.
     When two statements are identical both are compared against each other; the
@@ -161,10 +161,7 @@ def _not_action_subsumed_by(a: Statement, b: Statement, catalog: ActionCatalog) 
 
 def _matches_not_action_patterns(normalized_action: str, patterns: list[str]) -> bool:
     """True when a normalized catalog action matches any normalized patterns."""
-    for pattern in patterns:
-        if fnmatchcase(normalized_action, pattern):
-            return True
-    return False
+    return any(fnmatchcase(normalized_action, pattern) for pattern in patterns)
 
 
 def _normalize_action_patterns(patterns: list[str]) -> list[str]:
