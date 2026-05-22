@@ -160,15 +160,15 @@ def _not_action_subsumed_by(a: Statement, b: Statement, catalog: ActionCatalog) 
 
 def _exempted_by_not_action_list(full_action: str, patterns: list[str]) -> bool:
     """True when *full_action* matches any ``NotAction`` exemption *patterns*."""
-    normalized_action = _normalise_action_match_term(full_action)
+    normalized_action = _normalize_action_match_term(full_action)
+    normalized_patterns = [_normalize_action_match_term(pattern) for pattern in patterns]
     return any(
-        fnmatchcase(normalized_action, _normalise_action_match_term(pattern))
-        for pattern in patterns
+        fnmatchcase(normalized_action, normalized_pattern) for normalized_pattern in normalized_patterns
     )
 
 
-def _normalise_action_match_term(action: str) -> str:
-    """Normalise an IAM action string for catalog-backed matching."""
+def _normalize_action_match_term(action: str) -> str:
+    """Normalize an IAM action string for catalog-backed matching."""
     if action == "*" or ":" not in action:
         return action
     service, _, name = action.partition(":")
