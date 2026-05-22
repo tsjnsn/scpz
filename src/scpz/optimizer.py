@@ -28,6 +28,7 @@ class OptimizationResult:
 
     original: ScpDocument
     optimized: ScpDocument
+    catalog: ActionCatalog
     passes_applied: list[str] = field(default_factory=list)
 
     @property
@@ -119,6 +120,7 @@ def optimize(
     return OptimizationResult(
         original=doc,
         optimized=optimized,
+        catalog=catalog,
         passes_applied=passes_applied,
     )
 
@@ -176,7 +178,7 @@ def _run_passes_once(
     # 5. Redundancy elimination
     if passes_cfg.redundancyEliminate.enabled:
         before = len(stmts)
-        stmts = eliminate_redundancy(stmts)
+        stmts = eliminate_redundancy(stmts, catalog=catalog)
         if len(stmts) < before:
             applied.append("redundancy-eliminate")
 

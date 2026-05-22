@@ -7,15 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-22
+
 ### Added
+- CI job **Equivalence golden regression** runs `tests/test_golden_regression.py`:
+  every `examples/*.json` and the NotAction fixtures in that module are
+  optimized then checked with `check_permission_equivalence` so merges block on
+  accidental permission broadening.
+- `scpz check-equivalence before.json after.json` — catalog-backed check that
+  the optimized (or other) policy did not broaden permissions versus a
+  baseline: ``Deny`` coverage must not shrink and ``Allow`` carve-outs must not
+  grow, grouped by effect, condition fingerprint, and resources.
+- `split_if_needed(..., catalog=...)` expands oversized `Deny` + `NotAction`
+  statements using the action catalog: denied atoms are re-encoded as chunked
+  `Deny` + `Action` lists so split output is permission-equivalent (no list
+  partitioning of exemptions, which would broaden denies).
+- Opt-in `redundancyEliminate` pass: when a non-empty action catalog is
+  configured, wholly redundant ``Deny`` + ``NotAction`` statements are removed
+  using the same catalog-backed exemption model as ``NotAction`` compression
+  (*exempt(B) ⊆ exempt(A)* in the catalog universe).
 - `spec.validation` in `scpz.yaml` with per-rule severities (`error`, `warn`,
   `ignore`) for wildcard actions, broad `Resource: "*"`, missing `Sid`, and
-  unknown service prefixes. The optimizer and `scpz validate` honour these
+  unknown service prefixes. Wildcard actions use `onWildcardAction`: the
+  service-specific part after `:` must contain `*` or `?` to match; the bare
+  action `*` is excluded. The optimizer and `scpz validate` honour these
   settings from the discovered config file.
 - `scpz validate` (and pre-optimize validation) cross-checks literal
   `Action` / `NotAction` strings against the configured AWS action catalog.
   Unknown actions for a catalogued service use `spec.validation.onUnknownCatalogAction`
   (default `warn`; set to `error` for strict mode, or `ignore` to skip).
+- `actionCompress` applies catalog-safe wildcard compression to ``NotAction``
+  lists when a non-empty action catalog is configured (same conservative trie
+  and ``catalog.covers`` proofs as ``Action``; aggressive shortening is not
+  used for ``NotAction`` because wildcards would exempt additional APIs).
+
+### Changed
+- `optimize` applies the same validation rules as `validate`, checks the
+  optimized document (and each split shard) before any write, exits non-zero
+  when any issue is elevated to `error`, and skips backups, in-place writes,
+  `--output`, and split file writes in that case.
+- `validate` loads project config per file so it honours `spec.validation`
+  (invalid `scpz.yaml` prints a config error and counts as failure for that
+  path without aborting the whole command).
 
 ## [0.2.7] - 2026-05-16
 
@@ -81,7 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dry-run and summary-only modes
 - Rich terminal output with diffs and optimization summaries
 
-[Unreleased]: https://github.com/tsjnsn/scpz/compare/v0.2.7...HEAD
+[Unreleased]: https://github.com/tsjnsn/scpz/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/tsjnsn/scpz/compare/v0.2.7...v0.3.0
 [0.2.7]: https://github.com/tsjnsn/scpz/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/tsjnsn/scpz/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/tsjnsn/scpz/compare/v0.2.3...v0.2.5

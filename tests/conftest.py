@@ -34,3 +34,9 @@ def mergeable() -> ScpDocument:
 @pytest.fixture
 def complex_multi() -> ScpDocument:
     return ScpDocument.from_file(str(FIXTURES_DIR / "complex_multi.json"))
+
+
+@pytest.fixture
+def oversized_not_action_deny() -> ScpDocument:
+    """Single Deny+NotAction statement whose minified JSON exceeds the SCP byte limit."""
+    return ScpDocument.from_file(str(FIXTURES_DIR / "oversized_not_action_deny.json"))

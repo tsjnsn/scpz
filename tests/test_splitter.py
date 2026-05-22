@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import pytest
 
+from scpz.catalog import ActionCatalog
 from scpz.constants import MAX_SCP_SIZE_BYTES, MAX_SCPS_PER_TARGET, MAX_STATEMENTS_PER_SCP
+from scpz.equivalence import _deny_not_action_statement_atoms, check_permission_equivalence
 from scpz.models import ScpDocument, Statement
 from scpz.splitter import SplitError, split_if_needed
 
@@ -51,6 +53,72 @@ class TestSplitter:
         result = split_if_needed(doc)
         for d in result.documents:
             assert d.version == "2012-10-17"
+
+
+def _merge_split_documents(documents: list[ScpDocument]) -> ScpDocument:
+    return ScpDocument(
+        version=documents[0].version,
+        statement=[s for d in documents for s in d.statement],
+    )
+
+
+def _oversized_not_action_catalog() -> ActionCatalog:
+    """Catalog with 435 ``s3`` actions; the fixture exempts 430 of them (0000-0429),
+    leaving 5 denied atoms (0430-0434) for catalog-backed expansion."""
+    return ActionCatalog.from_dict(
+        {"s3": [f"SomeActionName{i:04d}" for i in range(435)]},
+    )
+
+
+class TestOversizedNotActionSplitting:
+    """Catalog-backed expansion of Deny+NotAction into chunked Deny+Action statements."""
+
+    def test_oversized_not_action_errors_without_catalog(
+        self,
+        oversized_not_action_deny: ScpDocument,
+    ) -> None:
+        with pytest.raises(SplitError, match="cannot be split further"):
+            split_if_needed(oversized_not_action_deny)
+
+    def test_oversized_not_action_errors_with_empty_catalog(
+        self,
+        oversized_not_action_deny: ScpDocument,
+    ) -> None:
+        with pytest.raises(SplitError, match="cannot be split further"):
+            split_if_needed(oversized_not_action_deny, catalog=ActionCatalog.empty())
+
+    def test_oversized_not_action_splits_with_catalog(
+        self,
+        oversized_not_action_deny: ScpDocument,
+    ) -> None:
+        catalog = _oversized_not_action_catalog()
+        result = split_if_needed(oversized_not_action_deny, catalog=catalog)
+        assert result.fits
+        for d in result.documents:
+            assert d.size_bytes <= MAX_SCP_SIZE_BYTES
+            assert len(d.statement) <= MAX_STATEMENTS_PER_SCP
+        merged = _merge_split_documents(result.documents)
+        eq = check_permission_equivalence(oversized_not_action_deny, merged, catalog)
+        assert eq.ok, eq.messages
+
+    def test_split_not_action_catalog_round_trip_denied_atoms(
+        self,
+        oversized_not_action_deny: ScpDocument,
+    ) -> None:
+        """Union of explicit Action lists matches catalog denied atoms from NotAction."""
+        catalog = _oversized_not_action_catalog()
+        before = oversized_not_action_deny.statement[0]
+        assert before.not_action is not None
+        expected_denied = _deny_not_action_statement_atoms(before, catalog)
+
+        result = split_if_needed(oversized_not_action_deny, catalog=catalog)
+        out_actions: set[str] = set()
+        for d in result.documents:
+            for s in d.statement:
+                assert s.not_action is None
+                assert s.effect == "Deny"
+                out_actions.update(s.action_list)
+        assert out_actions == expected_denied
 
 
 class TestOversizedStatementSplitting:

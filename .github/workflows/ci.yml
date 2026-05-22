@@ -78,7 +78,7 @@ jobs:
         run: uv sync --dev
 
       - name: Run tests
-        run: uv run pytest --cov=scpz --cov-report=term-missing -v
+        run: uv run pytest --cov=scpz --cov-report=term-missing -v --ignore=tests/test_golden_regression.py
 
       - name: Check SCP fixtures are valid JSON
         run: |
@@ -90,3 +90,23 @@ jobs:
         run: |
           uv run scpz schema | diff - schema/OptimizerConfig.json || \
             (echo "schema/OptimizerConfig.json is out of date. Run: scpz schema -o schema/OptimizerConfig.json" && exit 1)
+
+  equivalence-golden:
+    name: Equivalence golden regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run optimize + equivalence golden tests
+        run: uv run pytest tests/test_golden_regression.py -v

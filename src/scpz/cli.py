@@ -6,7 +6,7 @@ import difflib
 import json
 import shutil
 import sys
-from pathlib import Path  # noqa: TC003  # required at runtime by Typer
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import typer
@@ -14,10 +14,12 @@ from rich.console import Console
 from rich.panel import Panel
 
 from scpz import __version__
+from scpz.catalog import ActionCatalog
 from scpz.config import SUPPORTED_API_VERSION, SUPPORTED_KIND, OptimizerConfig
+from scpz.equivalence import check_permission_equivalence
 from scpz.optimizer import OptimizationResult, optimize
 from scpz.splitter import SplitError, split_if_needed
-from scpz.validator import Severity, ValidationResult, validate_file
+from scpz.validator import Severity, ValidationResult, validate_document, validate_file
 
 if TYPE_CHECKING:
     from scpz.models import ScpDocument
@@ -128,9 +130,16 @@ def _optimize_file(
     _print_validation(val_result, file_path)
     if doc is None:
         raise typer.Exit(code=1)
+    if not val_result.is_valid:
+        raise typer.Exit(code=1)
 
     # Optimize
     result = optimize(doc, config=cfg)
+
+    post_val = validate_document(result.optimized, validation=cfg.spec.validation)
+    _print_validation(post_val, file_path)
+    if not post_val.is_valid:
+        raise typer.Exit(code=1)
 
     # --no-split CLI flag overrides config; otherwise honour split pass config
     split_enabled = (
@@ -142,7 +151,7 @@ def _optimize_file(
     # Check if splitting is needed
     if not result.fits_single_scp and split_enabled:
         try:
-            split_result = split_if_needed(result.optimized)
+            split_result = split_if_needed(result.optimized, catalog=result.catalog)
         except SplitError:
             raise
         if split_result.count > 1:
@@ -153,6 +162,7 @@ def _optimize_file(
                 output=output,
                 dry_run=dry_run,
                 summary_only=summary_only,
+                cfg=cfg,
             )
             return
     elif not result.fits_single_scp and not split_enabled:
@@ -183,6 +193,7 @@ def _handle_split_output(
     output: Path | None,
     dry_run: bool,
     summary_only: bool,
+    cfg: OptimizerConfig,
 ) -> None:
     """Handle output when policy is split into multiple files."""
     console.print(f"[yellow]⚠ Splitting {file_path.name} into {len(documents)} SCPs[/yellow]")
@@ -192,6 +203,12 @@ def _handle_split_output(
         stem = file_path.stem
         suffix = file_path.suffix
         out_name = f"{stem}_{i}{suffix}"
+
+        split_val = validate_document(doc, validation=cfg.spec.validation)
+        _print_validation(split_val, Path(out_name))
+        if not split_val.is_valid:
+            console.print("[red]Split output failed validation; not writing.[/red]")
+            raise typer.Exit(code=1)
 
         if dry_run or summary_only:
             console.print(
@@ -261,6 +278,53 @@ def validate_cmd(
         raise typer.Exit(code=1)
 
     console.print("[green]✓ All files are valid.[/green]")
+
+
+# ── check-equivalence command ───────────────────────────────────────
+
+
+@app.command("check-equivalence")
+def check_equivalence_cmd(
+    before: Path = typer.Argument(..., help="SCP JSON before optimization."),
+    after: Path = typer.Argument(..., help="SCP JSON after optimization."),
+) -> None:
+    """Verify that *after* did not broaden permissions versus *before* (catalog model)."""
+    if not before.is_file():
+        console.print(f"[red]File not found:[/red] {before}")
+        raise typer.Exit(code=1)
+    if not after.is_file():
+        console.print(f"[red]File not found:[/red] {after}")
+        raise typer.Exit(code=1)
+
+    try:
+        cfg = OptimizerConfig.load(before)
+    except ValueError as exc:
+        console.print(f"[red]Config error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    doc_before, val_b = validate_file(before, config=cfg)
+    _print_validation(val_b, before)
+    if doc_before is None:
+        raise typer.Exit(code=1)
+
+    doc_after, val_a = validate_file(after, config=cfg)
+    _print_validation(val_a, after)
+    if doc_after is None:
+        raise typer.Exit(code=1)
+
+    catalog = ActionCatalog.load(cfg.spec.catalog)
+    eq = check_permission_equivalence(doc_before, doc_after, catalog)
+    if eq.ok:
+        console.print(
+            "[green]✓ Equivalence OK:[/green] after is same or stricter than before "
+            "(Deny / Allow catalog model)."
+        )
+        raise typer.Exit(code=0)
+
+    console.print("[red]Equivalence check failed.[/red]")
+    for msg in eq.messages:
+        console.print(f"  [red]•[/red] {msg}")
+    raise typer.Exit(code=1)
 
 
 # ── helpers ──────────────────────────────────────────────────────────

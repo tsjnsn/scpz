@@ -24,6 +24,40 @@ uv run mypy src/
 uv run pytest -q
 ```
 
+To run only the optimize + equivalence golden regression suite (same checks as the
+**Equivalence golden regression** CI job):
+
+```bash
+uv run pytest tests/test_golden_regression.py -v
+```
+
+### Equivalence golden regression
+
+`tests/test_golden_regression.py` loads every `examples/*.json` plus the NotAction
+fixtures listed in `NOT_ACTION_REGRESSION_FILES`, runs the optimizer with
+`OptimizerConfig.load` (so `examples/scpz.yaml` applies to example policies), and
+requires `check_permission_equivalence` in `scpz.equivalence` to pass — the
+optimized policy must not be **broader** than the input under the catalog-backed
+model.
+
+Expectations are **semantic** (equivalence), not committed JSON snapshots, so
+formatting-only changes or a refreshed bundled catalog do not require updating
+golden files.
+
+When CI fails on this suite:
+
+- **Unintended optimizer regression (permissions broadened):** fix the optimizer
+  (or validation) so equivalence holds again.
+- **Intentional change to equivalence rules:** update `src/scpz/equivalence.py`
+  and extend or adjust `tests/test_equivalence.py` and this golden module as
+  needed.
+- **Fixture or example policy should change:** edit the JSON under `examples/` or
+  `tests/fixtures/`.
+- **New example SCP:** add `examples/<name>.json` — it is picked up automatically.
+- **New NotAction regression fixture:** add the JSON under `tests/fixtures/` and
+  append its filename to `NOT_ACTION_REGRESSION_FILES` in
+  `tests/test_golden_regression.py`.
+
 If you modify `src/scpz/config.py` (Pydantic models), also regenerate the committed schema:
 
 ```bash
