@@ -74,7 +74,11 @@ def optimize(
         None,
         "--output",
         "-o",
-        help="Write optimized JSON here instead of updating PATH in place.",
+        help=(
+            "Destination for optimized JSON. For one policy without splitting, a file path "
+            "(in-place when omitted). For split output or when PATH is a directory of policies, "
+            "must be a directory; split files are written as <stem>_N.json inside it."
+        ),
     ),
     dry_run: bool = typer.Option(
         False,
@@ -98,12 +102,21 @@ def optimize(
         console.print("[red]No JSON files found.[/red]")
         raise typer.Exit(code=1)
 
+    if len(files) > 1 and output is not None:
+        _require_output_directory(
+            output,
+            reason=f"PATH contains {len(files)} policies",
+        )
+
     exit_code = 0
     for file_path in files:
+        file_output = output
+        if len(files) > 1 and output is not None:
+            file_output = output / file_path.name
         try:
             _optimize_file(
                 file_path,
-                output=output,
+                output=file_output,
                 dry_run=dry_run,
                 summary_only=summary_only,
                 no_split=no_split,
@@ -193,6 +206,8 @@ def _optimize_file(
                 file_path.name,
             )
     else:
+        if output is not None:
+            _reject_output_directory_for_single_file(output)
         _write_optimized(file_path, result.optimized, output)
         _print_summary(result, file_path)
 
@@ -210,6 +225,11 @@ def _handle_split_output(
     """Handle output when policy is split into multiple files."""
     console.print(f"[yellow]⚠ Splitting {file_path.name} into {len(documents)} SCPs[/yellow]")
     _print_summary(result, file_path)
+
+    if not dry_run and not summary_only:
+        out_dir = _resolve_split_output_dir(output, file_path)
+    else:
+        out_dir = None
 
     for i, doc in enumerate(documents, 1):
         stem = file_path.stem
@@ -231,7 +251,7 @@ def _handle_split_output(
             if dry_run and not summary_only:
                 _print_diff("", doc.to_json(), out_name)
         else:
-            out_dir = output or file_path.parent
+            assert out_dir is not None
             out_path = out_dir / out_name
             out_path.write_text(doc.to_json() + "\n", encoding="utf-8")
             console.print(f"  → wrote {out_path}")
@@ -364,6 +384,47 @@ def _resolve_files(path: Path) -> list[Path]:
         return sorted(path.glob("*.json"))
     console.print(f"[red]Path not found:[/red] {path}")
     return []
+
+
+def _output_path_kind(path: Path) -> str:
+    """Classify an --output path as ``file`` or ``directory``."""
+    if path.exists():
+        return "directory" if path.is_dir() else "file"
+    if path.suffix.lower() == ".json":
+        return "file"
+    return "directory"
+
+
+def _require_output_directory(output: Path, *, reason: str) -> None:
+    """Require --output to be a directory (create parents as needed)."""
+    kind = _output_path_kind(output)
+    if kind == "file":
+        console.print(f"[red]Error:[/red] --output must be a directory when {reason}.")
+        raise typer.Exit(code=1)
+    output.mkdir(parents=True, exist_ok=True)
+
+
+def _reject_output_directory_for_single_file(output: Path) -> None:
+    """Reject --output when it names a directory but only one SCP will be written."""
+    if _output_path_kind(output) == "directory":
+        console.print(
+            "[red]Error:[/red] --output must be a file path when writing a single optimized SCP."
+        )
+        raise typer.Exit(code=1)
+
+
+def _resolve_split_output_dir(output: Path | None, file_path: Path) -> Path:
+    """Resolve the directory for split SCP output files."""
+    if output is None:
+        return file_path.parent
+    kind = _output_path_kind(output)
+    if kind == "file":
+        console.print(
+            "[red]Error:[/red] --output must be a directory when splitting into multiple SCPs."
+        )
+        raise typer.Exit(code=1)
+    output.mkdir(parents=True, exist_ok=True)
+    return output
 
 
 def _print_validation(result: ValidationResult, file_path: Path) -> None:

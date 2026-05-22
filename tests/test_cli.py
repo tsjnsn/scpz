@@ -278,6 +278,49 @@ class TestOptimizeSplit:
         written = sorted(tmp_path.glob("needs_split_*.json"))
         assert len(written) > 1
 
+    def test_split_with_output_directory(self, tmp_path: Path) -> None:
+        policy = _needs_split_policy(tmp_path)
+        out_dir = tmp_path / "split-out"
+        result = runner.invoke(app, ["optimize", str(policy), "--output", str(out_dir)])
+        assert result.exit_code == 0
+        written = sorted(out_dir.glob("needs_split_*.json"))
+        assert len(written) > 1
+
+    def test_split_with_output_file_rejected(self, tmp_path: Path) -> None:
+        policy = _needs_split_policy(tmp_path)
+        out_file = tmp_path / "combined.json"
+        result = runner.invoke(app, ["optimize", str(policy), "--output", str(out_file)])
+        assert result.exit_code == 1
+        assert "directory" in result.stderr.lower()
+        assert not out_file.exists()
+
+
+class TestOptimizeOutput:
+    def test_batch_output_must_be_directory(self, fixtures_dir: Path, tmp_path: Path) -> None:
+        shutil.copy2(fixtures_dir / "simple_deny.json", tmp_path / "a.json")
+        shutil.copy2(fixtures_dir / "mergeable_statements.json", tmp_path / "b.json")
+        out_file = tmp_path / "out.json"
+        result = runner.invoke(
+            app,
+            ["optimize", str(tmp_path), "--output", str(out_file)],
+        )
+        assert result.exit_code == 1
+        assert "directory" in result.stderr.lower()
+
+    def test_batch_output_directory_writes_per_file(
+        self, fixtures_dir: Path, tmp_path: Path
+    ) -> None:
+        shutil.copy2(fixtures_dir / "simple_deny.json", tmp_path / "a.json")
+        shutil.copy2(fixtures_dir / "mergeable_statements.json", tmp_path / "b.json")
+        out_dir = tmp_path / "optimized"
+        result = runner.invoke(
+            app,
+            ["optimize", str(tmp_path), "--output", str(out_dir)],
+        )
+        assert result.exit_code == 0
+        assert (out_dir / "a.json").exists()
+        assert (out_dir / "b.json").exists()
+
 
 class TestOptimizeCommand:
     def test_dry_run(self, fixtures_dir: Path) -> None:
