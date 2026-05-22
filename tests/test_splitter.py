@@ -63,7 +63,8 @@ def _merge_split_documents(documents: list[ScpDocument]) -> ScpDocument:
 
 
 def _oversized_not_action_catalog() -> ActionCatalog:
-    """Catalog aligned with ``oversized_not_action_deny.json`` (435 ``s3`` actions)."""
+    """Catalog with 435 ``s3`` actions; the fixture exempts 430 of them (0000-0429),
+    leaving 5 denied atoms (0430-0434) for catalog-backed expansion."""
     return ActionCatalog.from_dict(
         {"s3": [f"SomeActionName{i:04d}" for i in range(435)]},
     )

@@ -151,8 +151,7 @@ def _optimize_file(
     # Check if splitting is needed
     if not result.fits_single_scp and split_enabled:
         try:
-            catalog = ActionCatalog.load(cfg.spec.catalog)
-            split_result = split_if_needed(result.optimized, catalog=catalog)
+            split_result = split_if_needed(result.optimized, catalog=result.catalog)
         except SplitError:
             raise
         if split_result.count > 1:

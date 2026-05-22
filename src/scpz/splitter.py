@@ -175,8 +175,10 @@ def _split_oversized_deny_not_action_via_catalog(
 
     try:
         denied_sorted = sorted(_deny_not_action_statement_atoms(stmt, catalog))
-    except ValueError as exc:
-        raise SplitError(str(exc)) from exc
+    except ValueError:
+        # Expansion failed (e.g. wildcard for an uncatalogued service).
+        # Signal "strategy not applicable" so the caller can try Resource splitting.
+        return None
 
     if not denied_sorted:
         raise SplitError(
