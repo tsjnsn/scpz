@@ -72,6 +72,13 @@ uv run scpz schema -o schema/OptimizerConfig.json
 4. Add a test file at `tests/test_<pass_name>.py`.
 5. Regenerate the schema.
 
+## `dev-ai` and Copilot
+
+Agent work targets the `dev-ai` branch; releases merge **`dev-ai` → `main`**. If Copilot
+cannot push review fixes (GH006 / required status checks on `dev-ai`), see
+[`.github/DEV_AI.md`](.github/DEV_AI.md) for branch ruleset setup—do not open a second PR
+just to land Copilot commits.
+
 ## Pull request guidelines
 
 - Keep PRs focused — one feature or fix per PR.
