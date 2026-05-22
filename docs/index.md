@@ -5,7 +5,7 @@
 ## Explore
 
 | Section | What you will find |
-| --- | --- |
+|:--------|:-------------------|
 | [User guide](user-guide.md) | Install, commands, optimization passes, and configuration (from the project README). |
 | [Claude skill](claude-skill.md) | How AI assistants discover scpz via `SKILL.md`, plus links to automation skills. |
 | [Agent rules](agents.md) | Contributor and automation expectations (`AGENTS.md`). |
