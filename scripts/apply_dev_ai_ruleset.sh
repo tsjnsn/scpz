@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Apply the dev-ai integration ruleset (Copilot-friendly).
-# Requires: gh CLI, repo admin on tsjnsn/scpz
+# Requires: gh CLI, repository admin on the GitHub repo that contains this checkout
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "${repo_root}"
 ruleset_file="${repo_root}/.github/rulesets/dev-ai-copilot-integration.json"
 
 if ! command -v gh >/dev/null 2>&1; then
