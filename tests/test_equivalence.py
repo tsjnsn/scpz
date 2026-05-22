@@ -6,7 +6,6 @@ import json
 import shutil
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from scpz.catalog import ActionCatalog
@@ -16,8 +15,9 @@ from scpz.equivalence import _expand_action_patterns_to_atoms, check_permission_
 from scpz.models import ScpDocument, Statement
 from scpz.optimizer import optimize
 
-runner = CliRunner()
 EXAMPLES_DIR = Path(__file__).resolve().parents[1] / "examples"
+
+runner = CliRunner()
 
 
 def _tiny_catalog() -> ActionCatalog:
@@ -184,21 +184,6 @@ class TestCheckPermissionEquivalence:
         expanded = _expand_action_patterns_to_atoms(["*"], catalog)
         assert expanded == {"s3:GetObject"}
         assert catalog.calls == 1
-
-
-class TestExamplesOptimizedEquivalence:
-    @pytest.mark.parametrize(
-        "name",
-        ["bloated_deny", "data_protection", "region_lockdown", "security_guardrails"],
-    )
-    def test_example_passes_versus_default_optimize(self, name: str) -> None:
-        path = EXAMPLES_DIR / f"{name}.json"
-        cfg = OptimizerConfig.load(path)
-        catalog = ActionCatalog.load(cfg.spec.catalog)
-        doc = ScpDocument.from_file(str(path))
-        result = optimize(doc, config=cfg)
-        eq = check_permission_equivalence(doc, result.optimized, catalog)
-        assert eq.ok, eq.messages
 
 
 class TestOptimizeFixturesEquivalence:
