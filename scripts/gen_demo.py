@@ -118,6 +118,11 @@ spec:
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
+def _strip_wrapped_line_padding(text: str) -> str:
+    """Remove Rich/Typer end-of-line padding from captured terminal output."""
+    return "\n".join(line.rstrip() for line in text.splitlines())
+
+
 def _run(cmd: list[str], cwd: Path) -> str:
     env = {**os.environ, "NO_COLOR": "1", "PYTHONUNBUFFERED": "1"}
     result = subprocess.run(
@@ -128,7 +133,7 @@ def _run(cmd: list[str], cwd: Path) -> str:
         cwd=cwd,
         env=env,
     )
-    return _ANSI_RE.sub("", result.stdout).rstrip()
+    return _strip_wrapped_line_padding(_ANSI_RE.sub("", result.stdout)).rstrip()
 
 
 def _scpz(args: str, cwd: Path) -> str:
@@ -144,9 +149,7 @@ def main() -> None:
         # Files for the max-settings demo (policy.json + scpz.yaml)
         max_dir = tmp / "max"
         max_dir.mkdir()
-        (max_dir / "policy.json").write_text(
-            json.dumps(POLICY_JSON, indent=2), encoding="utf-8"
-        )
+        (max_dir / "policy.json").write_text(json.dumps(POLICY_JSON, indent=2), encoding="utf-8")
         (max_dir / "scpz.yaml").write_text(MAX_SCPZ_YAML, encoding="utf-8")
 
         # No-config directory (policy.json only, no scpz.yaml)

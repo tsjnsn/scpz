@@ -6,12 +6,12 @@ scpz 0.3.0
 
 $ scpz --help
 
-                                                                                
- Usage: scpz [OPTIONS] COMMAND [ARGS]...                                        
-                                                                                
- Optimize and validate AWS Service Control Policy (SCP) JSON for Organizations  
- limits.                                                                        
-                                                                                
+
+ Usage: scpz [OPTIONS] COMMAND [ARGS]...
+
+ Optimize and validate AWS Service Control Policy (SCP) JSON for Organizations
+ limits.
+
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
 │ --version  -V        Print version information and exit.                     │
 │ --help               Show this message and exit.                             │
@@ -25,26 +25,26 @@ $ scpz --help
 │ check-equivalence  Verify AFTER did not broaden permissions versus BEFORE    │
 │                    (catalog model).                                          │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-                                                                                
+
  Run `scpz <command> --help` for command-specific options.
 
 $ scpz validate bloated_deny.json
 WARNING bloated_deny.json: SCP has 8 statements (limit is 5)
-WARNING bloated_deny.json at Statement[6].Resource[0]: Resource '*' with no 
+WARNING bloated_deny.json at Statement[6].Resource[0]: Resource '*' with no
 Condition is very broad
-WARNING bloated_deny.json at Statement[7].Resource[0]: Resource '*' with no 
+WARNING bloated_deny.json at Statement[7].Resource[0]: Resource '*' with no
 Condition is very broad
 ✓ All files are valid.
 
 $ scpz optimize bloated_deny.json --summary-only
 WARNING bloated_deny.json: SCP has 8 statements (limit is 5)
-WARNING bloated_deny.json at Statement[6].Resource[0]: Resource '*' with no 
+WARNING bloated_deny.json at Statement[6].Resource[0]: Resource '*' with no
 Condition is very broad
-WARNING bloated_deny.json at Statement[7].Resource[0]: Resource '*' with no 
+WARNING bloated_deny.json at Statement[7].Resource[0]: Resource '*' with no
 Condition is very broad
-WARNING bloated_deny.json at Statement[0].Action[2]: Action 's3:PutBucketP*' 
+WARNING bloated_deny.json at Statement[0].Action[2]: Action 's3:PutBucketP*'
 contains a wildcard in the action name
-WARNING bloated_deny.json at Statement[1].Resource[0]: Resource '*' with no 
+WARNING bloated_deny.json at Statement[1].Resource[0]: Resource '*' with no
 Condition is very broad
 ╭───────────────────────────── bloated_deny.json ──────────────────────────────╮
 │ Size: 1,510 → 511 bytes (999 saved)                                          │
@@ -54,13 +54,13 @@ Condition is very broad
 
 $ scpz optimize bloated_deny.json --dry-run
 WARNING bloated_deny.json: SCP has 8 statements (limit is 5)
-WARNING bloated_deny.json at Statement[6].Resource[0]: Resource '*' with no 
+WARNING bloated_deny.json at Statement[6].Resource[0]: Resource '*' with no
 Condition is very broad
-WARNING bloated_deny.json at Statement[7].Resource[0]: Resource '*' with no 
+WARNING bloated_deny.json at Statement[7].Resource[0]: Resource '*' with no
 Condition is very broad
-WARNING bloated_deny.json at Statement[0].Action[2]: Action 's3:PutBucketP*' 
+WARNING bloated_deny.json at Statement[0].Action[2]: Action 's3:PutBucketP*'
 contains a wildcard in the action name
-WARNING bloated_deny.json at Statement[1].Resource[0]: Resource '*' with no 
+WARNING bloated_deny.json at Statement[1].Resource[0]: Resource '*' with no
 Condition is very broad
 ╭───────────────────────────── bloated_deny.json ──────────────────────────────╮
 │ Size: 1,510 → 511 bytes (999 saved)                                          │
@@ -162,13 +162,13 @@ Condition is very broad
 
 $ scpz optimize bloated_deny.json
 WARNING bloated_deny.json: SCP has 8 statements (limit is 5)
-WARNING bloated_deny.json at Statement[6].Resource[0]: Resource '*' with no 
+WARNING bloated_deny.json at Statement[6].Resource[0]: Resource '*' with no
 Condition is very broad
-WARNING bloated_deny.json at Statement[7].Resource[0]: Resource '*' with no 
+WARNING bloated_deny.json at Statement[7].Resource[0]: Resource '*' with no
 Condition is very broad
-WARNING bloated_deny.json at Statement[0].Action[2]: Action 's3:PutBucketP*' 
+WARNING bloated_deny.json at Statement[0].Action[2]: Action 's3:PutBucketP*'
 contains a wildcard in the action name
-WARNING bloated_deny.json at Statement[1].Resource[0]: Resource '*' with no 
+WARNING bloated_deny.json at Statement[1].Resource[0]: Resource '*' with no
 Condition is very broad
 Backup: bloated_deny.json.bak
 ✓ Wrote bloated_deny.json
@@ -208,19 +208,19 @@ spec:
 
 $ scpz optimize policy.json --summary-only   # default settings, no scpz.yaml
 WARNING policy.json: SCP has 6 statements (limit is 5)
-WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[1].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[1].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[2].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[2].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[3].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[3].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[4].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[4].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[5].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[5].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition
 is very broad
 ╭──────────────────────────────── policy.json ─────────────────────────────────╮
 │ Size: 1,213 → 813 bytes (400 saved)                                          │
@@ -230,31 +230,31 @@ is very broad
 
 $ scpz optimize policy.json --summary-only   # with scpz.yaml (max settings)
 WARNING policy.json: SCP has 6 statements (limit is 5)
-WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[1].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[1].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[2].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[2].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[3].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[3].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[4].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[4].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[5].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[5].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[0].Action[4]: Action 'config:Dele*' contains a 
+WARNING policy.json at Statement[0].Action[4]: Action 'config:Dele*' contains a
 wildcard in the action name
-WARNING policy.json at Statement[0].Action[6]: Action 'guardduty:Del*' contains 
+WARNING policy.json at Statement[0].Action[6]: Action 'guardduty:Del*' contains
 a wildcard in the action name
-WARNING policy.json at Statement[0].Action[7]: Action 'guardduty:Disas*' 
+WARNING policy.json at Statement[0].Action[7]: Action 'guardduty:Disas*'
 contains a wildcard in the action name
-WARNING policy.json at Statement[0].Action[10]: Action 'iam:Cr*' contains a 
+WARNING policy.json at Statement[0].Action[10]: Action 'iam:Cr*' contains a
 wildcard in the action name
-WARNING policy.json at Statement[0].Action[11]: Action 'iam:Del*' contains a 
+WARNING policy.json at Statement[0].Action[11]: Action 'iam:Del*' contains a
 wildcard in the action name
-WARNING policy.json at Statement[0].Action[14]: Action 'iam:Upd*' contains a 
+WARNING policy.json at Statement[0].Action[14]: Action 'iam:Upd*' contains a
 wildcard in the action name
-WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition
 is very broad
 ╭──────────────────────────────── policy.json ─────────────────────────────────╮
 │ Size: 1,213 → 399 bytes (814 saved)                                          │
@@ -264,31 +264,31 @@ is very broad
 
 $ scpz optimize policy.json --dry-run        # full diff, max settings
 WARNING policy.json: SCP has 6 statements (limit is 5)
-WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[1].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[1].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[2].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[2].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[3].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[3].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[4].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[4].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[5].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[5].Resource[0]: Resource '*' with no Condition
 is very broad
-WARNING policy.json at Statement[0].Action[4]: Action 'config:Dele*' contains a 
+WARNING policy.json at Statement[0].Action[4]: Action 'config:Dele*' contains a
 wildcard in the action name
-WARNING policy.json at Statement[0].Action[6]: Action 'guardduty:Del*' contains 
+WARNING policy.json at Statement[0].Action[6]: Action 'guardduty:Del*' contains
 a wildcard in the action name
-WARNING policy.json at Statement[0].Action[7]: Action 'guardduty:Disas*' 
+WARNING policy.json at Statement[0].Action[7]: Action 'guardduty:Disas*'
 contains a wildcard in the action name
-WARNING policy.json at Statement[0].Action[10]: Action 'iam:Cr*' contains a 
+WARNING policy.json at Statement[0].Action[10]: Action 'iam:Cr*' contains a
 wildcard in the action name
-WARNING policy.json at Statement[0].Action[11]: Action 'iam:Del*' contains a 
+WARNING policy.json at Statement[0].Action[11]: Action 'iam:Del*' contains a
 wildcard in the action name
-WARNING policy.json at Statement[0].Action[14]: Action 'iam:Upd*' contains a 
+WARNING policy.json at Statement[0].Action[14]: Action 'iam:Upd*' contains a
 wildcard in the action name
-WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition 
+WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition
 is very broad
 ╭──────────────────────────────── policy.json ─────────────────────────────────╮
 │ Size: 1,213 → 399 bytes (814 saved)                                          │
