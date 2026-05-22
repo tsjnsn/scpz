@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `scpz check-equivalence before.json after.json` — catalog-backed check that
+  the optimized (or other) policy did not broaden permissions versus a
+  baseline: ``Deny`` coverage must not shrink and ``Allow`` carve-outs must not
+  grow, grouped by effect, condition fingerprint, and resources.
 - `spec.validation` in `scpz.yaml` with per-rule severities (`error`, `warn`,
   `ignore`) for wildcard actions, broad `Resource: "*"`, missing `Sid`, and
   unknown service prefixes. The optimizer and `scpz validate` honour these
