@@ -20,7 +20,7 @@ fi
 owner_repo="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
 echo "Applying ruleset to ${owner_repo} from ${ruleset_file}"
 
-if gh api "repos/${owner_repo}/rulesets" --jq '.[].name' 2>/dev/null | grep -qx 'dev-ai integration (Copilot-friendly)'; then
+if gh api --paginate "repos/${owner_repo}/rulesets" --jq '.[].name' 2>/dev/null | grep -qx 'dev-ai integration (Copilot-friendly)'; then
   echo "Ruleset already exists. Update it in Settings → Rules → Rulesets, or delete and re-run."
   exit 0
 fi

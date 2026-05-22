@@ -1,25 +1,26 @@
-# scpz documentation
+# scpz
 
-**scpz** is a correctness-minded Python CLI that optimizes AWS Service Control Policy (SCP) JSON so it fits AWS Organizations limits: **10,240 bytes** per policy, **5 statements** per SCP, and up to **10 SCPs** per account or OU.
+**scpz** is a correctness-minded Python CLI that optimizes AWS Service Control Policy (SCP) JSON to fit AWS Organizations limits: **10,240 bytes** per policy, **5 statements** per SCP, and up to **10 SCPs** per account or OU.
 
-## Explore
+## Documentation
 
-| Section | What you will find |
-|:--------|:-------------------|
-| [User guide](user-guide.md) | Install, commands, optimization passes, and configuration (from the project README). |
-| [Claude skill](claude-skill.md) | How AI assistants discover scpz via `SKILL.md`, plus links to automation skills. |
-| [Agent rules](agents.md) | Contributor and automation expectations (`AGENTS.md`). |
-| [Contributing](contributing.md) | Local setup, checks, and pull request expectations. |
-| [Changelog](changelog.md) | Release history. |
+| Page | Contents |
+|:-----|:---------|
+| [User guide](user-guide.md) | Install, CLI usage, optimization passes, configuration |
+| [Claude skill](claude-skill.md) | Assistant skill (`SKILL.md`) and related automation |
+| [Agent rules](agents.md) | Expectations for contributors and coding agents |
+| [Contributing](contributing.md) | Local setup, checks, pull requests |
+| [Changelog](changelog.md) | Release notes |
+| [GitHub Pages setup](pages-setup.md) | One-time Pages enablement for maintainers |
 
-Use the **search bar** in the header to jump to any heading or phrase across these pages.
+Use **Search** in the header to jump to any heading.
 
-## Quick links
+## Links
 
 - [Repository](https://github.com/tsjnsn/scpz)
 - [Issues](https://github.com/tsjnsn/scpz/issues)
-- [PyPI package](https://pypi.org/project/scpz/)
-- [CI status](https://github.com/tsjnsn/scpz/actions/workflows/ci.yml)
+- [PyPI](https://pypi.org/project/scpz/)
+- [CI](https://github.com/tsjnsn/scpz/actions/workflows/ci.yml)
 
 ## Maintainer note
 
