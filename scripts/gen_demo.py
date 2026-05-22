@@ -182,22 +182,22 @@ def main() -> None:
             "$ scpz validate bloated_deny.json",
             _scpz("validate bloated_deny.json", tmp),
             "",
-            "$ scpz optimize-cmd bloated_deny.json --summary-only",
-            _scpz("optimize-cmd bloated_deny.json --summary-only", tmp),
+            "$ scpz optimize bloated_deny.json --summary-only",
+            _scpz("optimize bloated_deny.json --summary-only", tmp),
             "",
         ]
 
         fresh_bloated()
         sections += [
-            "$ scpz optimize-cmd bloated_deny.json --dry-run",
-            _scpz("optimize-cmd bloated_deny.json --dry-run", tmp),
+            "$ scpz optimize bloated_deny.json --dry-run",
+            _scpz("optimize bloated_deny.json --dry-run", tmp),
             "",
         ]
 
         fresh_bloated()
         sections += [
-            "$ scpz optimize-cmd bloated_deny.json",
-            _scpz("optimize-cmd bloated_deny.json", tmp),
+            "$ scpz optimize bloated_deny.json",
+            _scpz("optimize bloated_deny.json", tmp),
             "",
         ]
 
@@ -221,14 +221,14 @@ def main() -> None:
             "# Input: 6 statements written by a human, split by intent.",
             '# One is a duplicate ("AlsoNoDeleteRole" repeats actions already in "DenyIAMRoleMgmt").',
             "",
-            "$ scpz optimize-cmd policy.json --summary-only   # default settings, no scpz.yaml",
-            _scpz("optimize-cmd policy.json --summary-only", noconf_dir),
+            "$ scpz optimize policy.json --summary-only   # default settings, no scpz.yaml",
+            _scpz("optimize policy.json --summary-only", noconf_dir),
             "",
-            "$ scpz optimize-cmd policy.json --summary-only   # with scpz.yaml (max settings)",
-            _scpz("optimize-cmd policy.json --summary-only", max_dir),
+            "$ scpz optimize policy.json --summary-only   # with scpz.yaml (max settings)",
+            _scpz("optimize policy.json --summary-only", max_dir),
             "",
-            "$ scpz optimize-cmd policy.json --dry-run        # full diff, max settings",
-            _scpz("optimize-cmd policy.json --dry-run", max_dir),
+            "$ scpz optimize policy.json --dry-run        # full diff, max settings",
+            _scpz("optimize policy.json --dry-run", max_dir),
         ]
 
         demo = REPO_ROOT / "demo.txt"

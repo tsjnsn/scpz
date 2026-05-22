@@ -25,7 +25,7 @@ If you change `src/scpz/config.py` (Pydantic models), also regenerate the
 committed schema file:
 
 ```bash
-uv run scpz schema -o schema/OptimizerConfig.json
+uv run scpz print-schema -o schema/OptimizerConfig.json
 ```
 
 ## Code conventions

@@ -68,6 +68,26 @@ class TestVersion:
         assert result.exit_code == 0
         assert "scpz" in result.stdout
 
+    def test_help_flag(self) -> None:
+        result = runner.invoke(app, ["--help"])
+        assert result.exit_code == 0
+        assert "optimize" in result.stdout
+        assert "print-schema" in result.stdout
+        assert "validate" in result.stdout
+        assert "check-equivalence" in result.stdout
+
+
+class TestLegacyCommandsRemoved:
+    """Breaking redesign: old command names must not be registered."""
+
+    def test_optimize_cmd_unknown(self) -> None:
+        result = runner.invoke(app, ["optimize-cmd", "--help"])
+        assert result.exit_code != 0
+
+    def test_schema_command_unknown(self) -> None:
+        result = runner.invoke(app, ["schema", "--help"])
+        assert result.exit_code != 0
+
 
 class TestValidateCommand:
     def test_validate_valid_file(self, fixtures_dir: Path) -> None:
@@ -92,14 +112,14 @@ class TestValidateCommand:
 
 class TestSchemaCommand:
     def test_stdout_is_valid_json(self) -> None:
-        result = runner.invoke(app, ["schema"])
+        result = runner.invoke(app, ["print-schema"])
         assert result.exit_code == 0
         schema = json.loads(result.output)
         assert schema.get("title") == "OptimizerConfig"
 
     def test_writes_to_file(self, tmp_path: Path) -> None:
         out = tmp_path / "schema.json"
-        result = runner.invoke(app, ["schema", "-o", str(out)])
+        result = runner.invoke(app, ["print-schema", "-o", str(out)])
         assert result.exit_code == 0
         assert out.exists()
         assert json.loads(out.read_text()).get("title") == "OptimizerConfig"
@@ -146,7 +166,7 @@ class TestOptimizeValidationSeverity:
         )
         before = policy.read_text()
 
-        result = runner.invoke(app, ["optimize-cmd", str(policy)])
+        result = runner.invoke(app, ["optimize", str(policy)])
         assert result.exit_code == 1
         assert not (tmp_path / "policy.json.bak").exists()
         assert policy.read_text() == before
@@ -174,7 +194,7 @@ class TestOptimizeValidationSeverity:
             encoding="utf-8",
         )
 
-        result = runner.invoke(app, ["optimize-cmd", str(policy)])
+        result = runner.invoke(app, ["optimize", str(policy)])
         assert result.exit_code == 0
         assert (tmp_path / "policy.json.bak").exists()
 
@@ -203,7 +223,7 @@ class TestOptimizeValidationSeverity:
         out = tmp_path / "optimized.json"
         result = runner.invoke(
             app,
-            ["optimize-cmd", str(policy), "--output", str(out)],
+            ["optimize", str(policy), "--output", str(out)],
         )
         assert result.exit_code == 1
         assert not out.exists()
@@ -211,51 +231,49 @@ class TestOptimizeValidationSeverity:
 
 class TestOptimizeErrors:
     def test_empty_dir_exits_1(self, tmp_path: Path) -> None:
-        result = runner.invoke(app, ["optimize-cmd", str(tmp_path)])
+        result = runner.invoke(app, ["optimize", str(tmp_path)])
         assert result.exit_code == 1
 
     def test_bad_config_exits_1(self, fixtures_dir: Path, tmp_path: Path) -> None:
         """Invalid scpz.yaml discovered while walking up triggers config error."""
         (tmp_path / "scpz.yaml").write_text("apiVersion: bad\nkind: Bad\n", encoding="utf-8")
         shutil.copy2(fixtures_dir / "simple_deny.json", tmp_path / "policy.json")
-        result = runner.invoke(app, ["optimize-cmd", str(tmp_path / "policy.json")])
+        result = runner.invoke(app, ["optimize", str(tmp_path / "policy.json")])
         assert result.exit_code == 1
 
     def test_unparseable_scp_exits_1(self, tmp_path: Path) -> None:
         """A JSON file that cannot be parsed as an SCP causes exit 1."""
         bad = tmp_path / "bad.json"
         bad.write_text('{"no": "statement"}', encoding="utf-8")
-        result = runner.invoke(app, ["optimize-cmd", str(bad)])
+        result = runner.invoke(app, ["optimize", str(bad)])
         assert result.exit_code == 1
 
     def test_no_split_oversized_exits_1(self, tmp_path: Path) -> None:
         policy = _needs_split_policy(tmp_path)
-        result = runner.invoke(app, ["optimize-cmd", str(policy), "--no-split"])
+        result = runner.invoke(app, ["optimize", str(policy), "--no-split"])
         assert result.exit_code == 1
 
     def test_split_error_propagates(self, tmp_path: Path) -> None:
         policy = _needs_split_policy(tmp_path)
         with patch("scpz.cli.split_if_needed", side_effect=SplitError("too complex")):
-            result = runner.invoke(app, ["optimize-cmd", str(policy)])
+            result = runner.invoke(app, ["optimize", str(policy)])
         assert result.exit_code == 1
 
 
 class TestOptimizeSplit:
     def test_dry_run(self, tmp_path: Path) -> None:
-        result = runner.invoke(
-            app, ["optimize-cmd", str(_needs_split_policy(tmp_path)), "--dry-run"]
-        )
+        result = runner.invoke(app, ["optimize", str(_needs_split_policy(tmp_path)), "--dry-run"])
         assert result.exit_code == 0
 
     def test_summary_only(self, tmp_path: Path) -> None:
         result = runner.invoke(
-            app, ["optimize-cmd", str(_needs_split_policy(tmp_path)), "--summary-only"]
+            app, ["optimize", str(_needs_split_policy(tmp_path)), "--summary-only"]
         )
         assert result.exit_code == 0
 
     def test_writes_multiple_files(self, tmp_path: Path) -> None:
         policy = _needs_split_policy(tmp_path)
-        result = runner.invoke(app, ["optimize-cmd", str(policy)])
+        result = runner.invoke(app, ["optimize", str(policy)])
         assert result.exit_code == 0
         written = sorted(tmp_path.glob("needs_split_*.json"))
         assert len(written) > 1
@@ -265,14 +283,14 @@ class TestOptimizeCommand:
     def test_dry_run(self, fixtures_dir: Path) -> None:
         result = runner.invoke(
             app,
-            ["optimize-cmd", str(fixtures_dir / "mergeable_statements.json"), "--dry-run"],
+            ["optimize", str(fixtures_dir / "mergeable_statements.json"), "--dry-run"],
         )
         assert result.exit_code == 0
 
     def test_summary_only(self, fixtures_dir: Path) -> None:
         result = runner.invoke(
             app,
-            ["optimize-cmd", str(fixtures_dir / "oversized.json"), "--summary-only"],
+            ["optimize", str(fixtures_dir / "oversized.json"), "--summary-only"],
         )
         assert result.exit_code == 0
 
@@ -281,7 +299,7 @@ class TestOptimizeCommand:
         dest = tmp_path / "policy.json"
         shutil.copy2(src, dest)
 
-        result = runner.invoke(app, ["optimize-cmd", str(dest)])
+        result = runner.invoke(app, ["optimize", str(dest)])
         assert result.exit_code == 0
         # Backup should exist
         assert (tmp_path / "policy.json.bak").exists()
@@ -295,7 +313,7 @@ class TestOptimizeCommand:
 
         result = runner.invoke(
             app,
-            ["optimize-cmd", str(src), "--output", str(out)],
+            ["optimize", str(src), "--output", str(out)],
         )
         assert result.exit_code == 0
         assert out.exists()
@@ -307,9 +325,9 @@ class TestOptimizeCommand:
         src = fixtures_dir / "simple_deny.json"
         out = tmp_path / "optimized.json"
         # Produce the canonical optimized form first
-        runner.invoke(app, ["optimize-cmd", str(src), "--output", str(out)])
+        runner.invoke(app, ["optimize", str(src), "--output", str(out)])
         # Second pass: optimizer has nothing left to change
-        result = runner.invoke(app, ["optimize-cmd", str(out), "--dry-run"])
+        result = runner.invoke(app, ["optimize", str(out), "--dry-run"])
         assert result.exit_code == 0
 
 

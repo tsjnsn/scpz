@@ -17,18 +17,24 @@ from scpz import __version__
 from scpz.catalog import ActionCatalog
 from scpz.config import SUPPORTED_API_VERSION, SUPPORTED_KIND, OptimizerConfig
 from scpz.equivalence import check_permission_equivalence
-from scpz.optimizer import OptimizationResult, optimize
+from scpz.optimizer import OptimizationResult
+from scpz.optimizer import optimize as run_optimize
 from scpz.splitter import SplitError, split_if_needed
 from scpz.validator import Severity, ValidationResult, validate_document, validate_file
 
 if TYPE_CHECKING:
     from scpz.models import ScpDocument
 
+_APP_HELP = "Optimize and validate AWS Service Control Policy (SCP) JSON for Organizations limits."
+_EPILOG = "Run `scpz <command> --help` for command-specific options."
+
 app = typer.Typer(
     name="scpz",
-    help="Intelligently optimize AWS SCP JSONs.",
+    help=_APP_HELP,
+    epilog=_EPILOG,
     no_args_is_help=True,
     add_completion=False,
+    rich_markup_mode="rich",
 )
 console = Console(stderr=True)
 out = Console()
@@ -46,43 +52,47 @@ def main(
         False,
         "--version",
         "-V",
-        help="Show version and exit.",
+        help="Print version information and exit.",
         callback=version_callback,
         is_eager=True,
     ),
 ) -> None:
-    """scpz — Intelligently optimize AWS SCP JSONs."""
+    """Optimize and validate AWS Service Control Policy (SCP) JSON."""
 
 
-# ── optimize command ─────────────────────────────────────────────────
+# ── optimize ─────────────────────────────────────────────────────────
 
 
-@app.command()
-def optimize_cmd(
-    path: Path = typer.Argument(..., help="SCP JSON file or directory of JSON files."),
+@app.command("optimize")
+def optimize(
+    path: Path = typer.Argument(
+        ...,
+        help="SCP JSON file or directory containing *.json policies.",
+        metavar="PATH",
+    ),
     output: Path | None = typer.Option(
         None,
         "--output",
         "-o",
-        help="Output path. Defaults to in-place with .bak backup.",
+        help="Write optimized JSON here instead of updating PATH in place.",
     ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        help="Show diff + summary without writing.",
+        help="Print summary and unified diff; do not write files.",
     ),
     summary_only: bool = typer.Option(
         False,
         "--summary-only",
-        help="Show optimization summary only (no diff).",
+        help="Print optimization summary only (no diff).",
     ),
     no_split: bool = typer.Option(
         False,
         "--no-split",
-        help="Error instead of splitting into multiple SCPs.",
+        help="Exit with an error if the policy still exceeds limits after optimization.",
     ),
 ) -> None:
-    """Optimize SCP JSON file(s) to fit within AWS limits."""
+    """Optimize SCP JSON to fit AWS Organizations size and statement limits."""
     files = _resolve_files(path)
     if not files:
         console.print("[red]No JSON files found.[/red]")
@@ -134,7 +144,7 @@ def _optimize_file(
         raise typer.Exit(code=1)
 
     # Optimize
-    result = optimize(doc, config=cfg)
+    result = run_optimize(doc, config=cfg)
 
     post_val = validate_document(
         result.optimized, validation=cfg.spec.validation, action_catalog=result.catalog
@@ -227,19 +237,19 @@ def _handle_split_output(
             console.print(f"  → wrote {out_path}")
 
 
-# ── schema command ───────────────────────────────────────────────────
+# ── print-schema ─────────────────────────────────────────────────────
 
 
-@app.command("schema")
-def schema_cmd(
+@app.command("print-schema")
+def print_schema(
     output: Path | None = typer.Option(
         None,
         "--output",
         "-o",
-        help="Write schema to a file instead of stdout.",
+        help="Write JSON Schema to this file instead of stdout.",
     ),
 ) -> None:
-    """Print the JSON Schema for scpz.yaml to stdout."""
+    """Emit the JSON Schema for scpz.yaml (OptimizerConfig)."""
     schema = OptimizerConfig.model_json_schema()
     # Annotate with $schema and $id so editors (e.g. VS Code YAML extension)
     # can resolve and apply the schema automatically.
@@ -258,14 +268,18 @@ def schema_cmd(
         sys.stdout.write(text)
 
 
-# ── validate command ─────────────────────────────────────────────────
+# ── validate ───────────────────────────────────────────────────────────
 
 
 @app.command("validate")
-def validate_cmd(
-    path: Path = typer.Argument(..., help="SCP JSON file or directory of JSON files."),
+def validate(
+    path: Path = typer.Argument(
+        ...,
+        help="SCP JSON file or directory containing *.json policies.",
+        metavar="PATH",
+    ),
 ) -> None:
-    """Validate SCP JSON file(s) without modifying them."""
+    """Check SCP JSON against structure, catalog, and configured validation rules."""
     files = _resolve_files(path)
     if not files:
         console.print("[red]No JSON files found.[/red]")
@@ -284,15 +298,23 @@ def validate_cmd(
     console.print("[green]✓ All files are valid.[/green]")
 
 
-# ── check-equivalence command ───────────────────────────────────────
+# ── check-equivalence ──────────────────────────────────────────────────
 
 
 @app.command("check-equivalence")
-def check_equivalence_cmd(
-    before: Path = typer.Argument(..., help="SCP JSON before optimization."),
-    after: Path = typer.Argument(..., help="SCP JSON after optimization."),
+def check_equivalence(
+    before: Path = typer.Argument(
+        ...,
+        help="Baseline SCP JSON (permissions must not shrink vs this file).",
+        metavar="BEFORE",
+    ),
+    after: Path = typer.Argument(
+        ...,
+        help="Candidate SCP JSON (must not broaden permissions vs BEFORE).",
+        metavar="AFTER",
+    ),
 ) -> None:
-    """Verify that *after* did not broaden permissions versus *before* (catalog model)."""
+    """Verify AFTER did not broaden permissions versus BEFORE (catalog model)."""
     if not before.is_file():
         console.print(f"[red]File not found:[/red] {before}")
         raise typer.Exit(code=1)

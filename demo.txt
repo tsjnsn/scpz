@@ -2,39 +2,66 @@ $ pip install scpz
 ...
 
 $ scpz --version
-scpz 0.2.7
+scpz 0.3.0
 
 $ scpz --help
 
                                                                                 
  Usage: scpz [OPTIONS] COMMAND [ARGS]...                                        
                                                                                 
- Intelligently optimize AWS SCP JSONs.                                          
+ Optimize and validate AWS Service Control Policy (SCP) JSON for Organizations  
+ limits.                                                                        
                                                                                 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --version  -V        Show version and exit.                                  │
+│ --version  -V        Print version information and exit.                     │
 │ --help               Show this message and exit.                             │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Commands ───────────────────────────────────────────────────────────────────╮
-│ optimize-cmd  Optimize SCP JSON file(s) to fit within AWS limits.            │
-│ schema        Print the JSON Schema for scpz.yaml to stdout.                 │
-│ validate      Validate SCP JSON file(s) without modifying them.              │
+│ optimize           Optimize SCP JSON to fit AWS Organizations size and       │
+│                    statement limits.                                         │
+│ print-schema       Emit the JSON Schema for scpz.yaml (OptimizerConfig).     │
+│ validate           Check SCP JSON against structure, catalog, and configured │
+│                    validation rules.                                         │
+│ check-equivalence  Verify AFTER did not broaden permissions versus BEFORE    │
+│                    (catalog model).                                          │
 ╰──────────────────────────────────────────────────────────────────────────────╯
+                                                                                
+ Run `scpz <command> --help` for command-specific options.
 
 $ scpz validate bloated_deny.json
 WARNING bloated_deny.json: SCP has 8 statements (limit is 5)
+WARNING bloated_deny.json at Statement[6].Resource[0]: Resource '*' with no 
+Condition is very broad
+WARNING bloated_deny.json at Statement[7].Resource[0]: Resource '*' with no 
+Condition is very broad
 ✓ All files are valid.
 
-$ scpz optimize-cmd bloated_deny.json --summary-only
+$ scpz optimize bloated_deny.json --summary-only
 WARNING bloated_deny.json: SCP has 8 statements (limit is 5)
+WARNING bloated_deny.json at Statement[6].Resource[0]: Resource '*' with no 
+Condition is very broad
+WARNING bloated_deny.json at Statement[7].Resource[0]: Resource '*' with no 
+Condition is very broad
+WARNING bloated_deny.json at Statement[0].Action[2]: Action 's3:PutBucketP*' 
+contains a wildcard in the action name
+WARNING bloated_deny.json at Statement[1].Resource[0]: Resource '*' with no 
+Condition is very broad
 ╭───────────────────────────── bloated_deny.json ──────────────────────────────╮
 │ Size: 1,510 → 511 bytes (999 saved)                                          │
 │ Statements: 8 → 2                                                            │
 │ Passes: statement-merge, action-compress                                     │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
-$ scpz optimize-cmd bloated_deny.json --dry-run
+$ scpz optimize bloated_deny.json --dry-run
 WARNING bloated_deny.json: SCP has 8 statements (limit is 5)
+WARNING bloated_deny.json at Statement[6].Resource[0]: Resource '*' with no 
+Condition is very broad
+WARNING bloated_deny.json at Statement[7].Resource[0]: Resource '*' with no 
+Condition is very broad
+WARNING bloated_deny.json at Statement[0].Action[2]: Action 's3:PutBucketP*' 
+contains a wildcard in the action name
+WARNING bloated_deny.json at Statement[1].Resource[0]: Resource '*' with no 
+Condition is very broad
 ╭───────────────────────────── bloated_deny.json ──────────────────────────────╮
 │ Size: 1,510 → 511 bytes (999 saved)                                          │
 │ Statements: 8 → 2                                                            │
@@ -133,8 +160,16 @@ WARNING bloated_deny.json: SCP has 8 statements (limit is 5)
        "Resource": "*"
      }
 
-$ scpz optimize-cmd bloated_deny.json
+$ scpz optimize bloated_deny.json
 WARNING bloated_deny.json: SCP has 8 statements (limit is 5)
+WARNING bloated_deny.json at Statement[6].Resource[0]: Resource '*' with no 
+Condition is very broad
+WARNING bloated_deny.json at Statement[7].Resource[0]: Resource '*' with no 
+Condition is very broad
+WARNING bloated_deny.json at Statement[0].Action[2]: Action 's3:PutBucketP*' 
+contains a wildcard in the action name
+WARNING bloated_deny.json at Statement[1].Resource[0]: Resource '*' with no 
+Condition is very broad
 Backup: bloated_deny.json.bak
 ✓ Wrote bloated_deny.json
 ╭───────────────────────────── bloated_deny.json ──────────────────────────────╮
@@ -171,24 +206,90 @@ spec:
 # Input: 6 statements written by a human, split by intent.
 # One is a duplicate ("AlsoNoDeleteRole" repeats actions already in "DenyIAMRoleMgmt").
 
-$ scpz optimize-cmd policy.json --summary-only   # default settings, no scpz.yaml
+$ scpz optimize policy.json --summary-only   # default settings, no scpz.yaml
 WARNING policy.json: SCP has 6 statements (limit is 5)
+WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[1].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[2].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[3].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[4].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[5].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition 
+is very broad
 ╭──────────────────────────────── policy.json ─────────────────────────────────╮
 │ Size: 1,213 → 813 bytes (400 saved)                                          │
 │ Statements: 6 → 1                                                            │
 │ Passes: statement-merge, action-compress                                     │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
-$ scpz optimize-cmd policy.json --summary-only   # with scpz.yaml (max settings)
+$ scpz optimize policy.json --summary-only   # with scpz.yaml (max settings)
 WARNING policy.json: SCP has 6 statements (limit is 5)
+WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[1].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[2].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[3].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[4].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[5].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[0].Action[4]: Action 'config:Dele*' contains a 
+wildcard in the action name
+WARNING policy.json at Statement[0].Action[6]: Action 'guardduty:Del*' contains 
+a wildcard in the action name
+WARNING policy.json at Statement[0].Action[7]: Action 'guardduty:Disas*' 
+contains a wildcard in the action name
+WARNING policy.json at Statement[0].Action[10]: Action 'iam:Cr*' contains a 
+wildcard in the action name
+WARNING policy.json at Statement[0].Action[11]: Action 'iam:Del*' contains a 
+wildcard in the action name
+WARNING policy.json at Statement[0].Action[14]: Action 'iam:Upd*' contains a 
+wildcard in the action name
+WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition 
+is very broad
 ╭──────────────────────────────── policy.json ─────────────────────────────────╮
 │ Size: 1,213 → 399 bytes (814 saved)                                          │
 │ Statements: 6 → 1                                                            │
 │ Passes: statement-merge, action-compress                                     │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
-$ scpz optimize-cmd policy.json --dry-run        # full diff, max settings
+$ scpz optimize policy.json --dry-run        # full diff, max settings
 WARNING policy.json: SCP has 6 statements (limit is 5)
+WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[1].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[2].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[3].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[4].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[5].Resource[0]: Resource '*' with no Condition 
+is very broad
+WARNING policy.json at Statement[0].Action[4]: Action 'config:Dele*' contains a 
+wildcard in the action name
+WARNING policy.json at Statement[0].Action[6]: Action 'guardduty:Del*' contains 
+a wildcard in the action name
+WARNING policy.json at Statement[0].Action[7]: Action 'guardduty:Disas*' 
+contains a wildcard in the action name
+WARNING policy.json at Statement[0].Action[10]: Action 'iam:Cr*' contains a 
+wildcard in the action name
+WARNING policy.json at Statement[0].Action[11]: Action 'iam:Del*' contains a 
+wildcard in the action name
+WARNING policy.json at Statement[0].Action[14]: Action 'iam:Upd*' contains a 
+wildcard in the action name
+WARNING policy.json at Statement[0].Resource[0]: Resource '*' with no Condition 
+is very broad
 ╭──────────────────────────────── policy.json ─────────────────────────────────╮
 │ Size: 1,213 → 399 bytes (814 saved)                                          │
 │ Statements: 6 → 1                                                            │
