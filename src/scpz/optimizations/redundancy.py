@@ -58,6 +58,7 @@ Example::
 
 from __future__ import annotations
 
+from fnmatch import fnmatchcase
 from typing import TYPE_CHECKING
 
 from scpz.optimizations.conditions import conditions_equal
@@ -74,10 +75,15 @@ def eliminate_redundancy(
 ) -> list[Statement]:
     """Remove statements wholly subsumed by another statement in *statements*.
 
-    Runs in O(n²) over the statement list — acceptable given the AWS limit of
-    5 statements per SCP.  When two statements are identical both are compared
-    against each other; the algorithm keeps the later one and discards the
-    earlier, leaving exactly one copy.
+    Runs in O(n²) over the statement list for ``Action`` statements. With a
+    non-empty *catalog*, each ``NotAction``-pair comparison also scans the
+    catalog and the pair's exemption patterns, so the worst case becomes
+    O(n² × c × p), where *c* is the number of catalog actions and *p* is the
+    number of ``NotAction`` patterns checked for the pair. This remains
+    acceptable given the AWS limit of 5 statements per SCP. When two
+    statements are identical both are compared against each other; the
+    algorithm keeps the later one and discards the earlier, leaving exactly
+    one copy.
 
     When *catalog* is non-empty, ``NotAction`` statements participate: see
     module docstring.  With no catalog (or an empty one), ``NotAction`` pairs
@@ -154,7 +160,19 @@ def _not_action_subsumed_by(a: Statement, b: Statement, catalog: ActionCatalog) 
 
 def _exempted_by_not_action_list(full_action: str, patterns: list[str]) -> bool:
     """True when *full_action* matches any ``NotAction`` exemption *patterns*."""
-    return any(_covers(p, full_action) for p in patterns)
+    normalized_action = _normalise_action_match_term(full_action)
+    return any(
+        fnmatchcase(normalized_action, _normalise_action_match_term(pattern))
+        for pattern in patterns
+    )
+
+
+def _normalise_action_match_term(action: str) -> str:
+    """Normalise an IAM action string for catalog-backed matching."""
+    if action == "*" or ":" not in action:
+        return action
+    service, _, name = action.partition(":")
+    return f"{service.lower()}:{name}"
 
 
 def _covers(covering: str, action: str) -> bool:

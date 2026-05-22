@@ -242,6 +242,29 @@ class TestEliminateRedundancyNotActionCatalog:
         assert len(result) == 1
         assert result[0] is wildcard
 
+    def test_glob_pattern_does_not_cause_false_subsumption(self) -> None:
+        catalog = ActionCatalog.from_dict({"iam": ["GetRole", "GetUser", "DeleteRole"]})
+        narrow = Statement(effect="Deny", not_action="iam:GetRole", resource="*")
+        broader = Statement(
+            effect="Deny",
+            not_action=["iam:GetRole", "iam:GetUs?r"],
+            resource="*",
+        )
+        result = eliminate_redundancy([narrow, broader], catalog=catalog)
+        assert len(result) == 1
+        assert result[0] is narrow
+
+    def test_service_prefix_case_is_ignored_for_catalog_matching(self) -> None:
+        narrow = Statement(effect="Deny", not_action="s3:GetObject", resource="*")
+        broader = Statement(
+            effect="Deny",
+            not_action=["S3:GetObject", "S3:PutObject"],
+            resource="*",
+        )
+        result = eliminate_redundancy([narrow, broader], catalog=self._cat_s3_rw())
+        assert len(result) == 1
+        assert result[0] is narrow
+
     def test_empty_catalog_skips_not_action(self) -> None:
         catalog = ActionCatalog.empty()
         a = Statement(effect="Deny", not_action="s3:GetObject", resource="*")
