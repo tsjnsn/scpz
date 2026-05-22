@@ -102,10 +102,12 @@ def optimize(
         console.print("[red]No JSON files found.[/red]")
         raise typer.Exit(code=1)
 
+    write_output = not dry_run and not summary_only
     if len(files) > 1 and output is not None:
         _require_output_directory(
             output,
             reason=f"PATH contains {len(files)} policies",
+            create=write_output,
         )
 
     exit_code = 0
@@ -123,12 +125,13 @@ def optimize(
                 summary_only=summary_only,
                 no_split=no_split,
             )
-        except (SplitError, typer.Exit) as exc:
-            if isinstance(exc, SplitError):
-                console.print(f"[red]Error:[/red] {exc}")
-                exit_code = 1
-            else:
-                raise
+        except SplitError as exc:
+            console.print(f"[red]Error:[/red] {exc}")
+            exit_code = 1
+        except typer.Exit as exc:
+            code = exc.exit_code if exc.exit_code is not None else 0
+            if code != 0:
+                exit_code = max(exit_code, code)
 
     if exit_code != 0:
         raise typer.Exit(code=exit_code)
@@ -405,12 +408,23 @@ def _looks_like_new_file_path(path: Path) -> bool:
     return not path.exists() and path.suffix.lower() == ".json"
 
 
-def _require_output_directory(output: Path, *, reason: str) -> None:
-    """Require --output to be a directory (create parents as needed)."""
+def _validate_output_directory(output: Path, *, reason: str) -> None:
+    """Require --output to name a directory, not a single file path."""
     if _is_existing_file(output) or _looks_like_new_file_path(output):
         console.print(f"[red]Error:[/red] --output must be a directory when {reason}.")
         raise typer.Exit(code=1)
+
+
+def _ensure_output_directory(output: Path) -> None:
+    """Create the output directory and any missing parents."""
     output.mkdir(parents=True, exist_ok=True)
+
+
+def _require_output_directory(output: Path, *, reason: str, create: bool = True) -> None:
+    """Validate --output is a directory; optionally create it on disk."""
+    _validate_output_directory(output, reason=reason)
+    if create:
+        _ensure_output_directory(output)
 
 
 def _reject_output_directory_for_single_file(output: Path) -> None:
@@ -431,7 +445,7 @@ def _resolve_split_output_dir(output: Path | None, file_path: Path) -> Path:
             "[red]Error:[/red] --output must be a directory when splitting into multiple SCPs."
         )
         raise typer.Exit(code=1)
-    output.mkdir(parents=True, exist_ok=True)
+    _ensure_output_directory(output)
     return output
 
 

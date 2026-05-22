@@ -347,6 +347,28 @@ class TestOptimizeOutput:
         written = sorted(out_dir.glob("needs_split_*.json"))
         assert len(written) > 1
 
+    def test_batch_dry_run_does_not_create_output_directory(
+        self, fixtures_dir: Path, tmp_path: Path
+    ) -> None:
+        shutil.copy2(fixtures_dir / "simple_deny.json", tmp_path / "a.json")
+        shutil.copy2(fixtures_dir / "mergeable_statements.json", tmp_path / "b.json")
+        out_dir = tmp_path / "would-create"
+        result = runner.invoke(
+            app,
+            ["optimize", str(tmp_path), "--output", str(out_dir), "--dry-run"],
+        )
+        assert result.exit_code == 0
+        assert not out_dir.exists()
+
+    def test_batch_continues_after_file_failure(self, fixtures_dir: Path, tmp_path: Path) -> None:
+        shutil.copy2(fixtures_dir / "simple_deny.json", tmp_path / "good.json")
+        (tmp_path / "bad.json").write_text("{not json", encoding="utf-8")
+        result = runner.invoke(app, ["optimize", str(tmp_path)])
+        assert result.exit_code == 1
+        combined = result.stdout + result.stderr
+        assert "good.json" in combined
+        assert "bad.json" in combined
+
 
 class TestOptimizeCommand:
     def test_dry_run(self, fixtures_dir: Path) -> None:
