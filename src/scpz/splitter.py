@@ -8,24 +8,38 @@ Splitting strategy
 ~~~~~~~~~~~~~~~~~~
 1. **Expand oversized statements** — any statement that is individually
    too large to fit in a single SCP is first split on its largest list
-   field (``Action`` takes priority, then ``Resource``).
+   field (``Action`` takes priority, then ``Deny`` + ``NotAction`` when a
+   non-empty :class:`~scpz.catalog.ActionCatalog` is supplied — see below,
+   then ``Resource``).
 2. **First-fit decreasing (FFD) packing** — the expanded statement list
    is sorted by descending byte weight, then each statement is placed
    into the first existing SCP document where it fits (both byte limit
    and 5-statement limit), opening a new document only when necessary.
    FFD typically produces fewer documents than sequential greedy packing.
+
+``Deny`` + ``NotAction`` cannot be split by *partitioning* the exemption
+list across statements: under AWS semantics the union of denies would
+change.  When a catalog is available, an oversized ``NotAction`` deny is
+instead expanded to the finite set of denied catalog atoms
+(``universe - exemptions``) and greedily re-chunked as ``Deny`` +
+``Action`` lists — union semantics match the original statement.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from scpz.constants import (
     MAX_SCP_SIZE_BYTES,
     MAX_SCPS_PER_TARGET,
     MAX_STATEMENTS_PER_SCP,
 )
+from scpz.equivalence import _deny_not_action_statement_atoms
 from scpz.models import ScpDocument, Statement
+
+if TYPE_CHECKING:
+    from scpz.catalog import ActionCatalog
 
 
 class SplitError(Exception):
@@ -50,19 +64,26 @@ class SplitResult:
         )
 
 
-def split_if_needed(doc: ScpDocument) -> SplitResult:
+def split_if_needed(doc: ScpDocument, *, catalog: ActionCatalog | None = None) -> SplitResult:
     """Split an SCP document if it exceeds AWS limits.
 
     Returns a ``SplitResult`` with one or more documents.  Raises
     ``SplitError`` if the policy cannot fit within ``MAX_SCPS_PER_TARGET``
     documents even after splitting, or if a single action/resource item
     is itself too large to fit in any SCP.
+
+    *catalog*
+        When non-empty, ``Deny`` statements that use ``NotAction`` and
+        exceed the per-SCP byte limit alone can be split safely by
+        re-encoding the implied deny set as chunked ``Action`` lists
+        (catalog-backed).  When omitted or empty, those statements fall back
+        to ``Resource`` splitting only (same as historical behaviour).
     """
     if _fits_single(doc):
         return SplitResult(documents=[doc])
 
     # Step 1: expand any statements that are individually over the size limit.
-    stmts = _expand_oversized_statements(list(doc.statement), doc.version)
+    stmts = _expand_oversized_statements(list(doc.statement), doc.version, catalog)
 
     # Step 2: pack using first-fit decreasing.
     documents = _pack_statements_ffd(doc.version, stmts)
@@ -82,13 +103,17 @@ def _fits_single(doc: ScpDocument) -> bool:
     return doc.size_bytes <= MAX_SCP_SIZE_BYTES and len(doc.statement) <= MAX_STATEMENTS_PER_SCP
 
 
-def _expand_oversized_statements(stmts: list[Statement], version: str) -> list[Statement]:
+def _expand_oversized_statements(
+    stmts: list[Statement],
+    version: str,
+    catalog: ActionCatalog | None,
+) -> list[Statement]:
     """Replace any statement too large to fit alone with a list of smaller chunks."""
     result: list[Statement] = []
     for stmt in stmts:
         single = ScpDocument(version=version, statement=[stmt])
         if single.size_bytes > MAX_SCP_SIZE_BYTES:
-            chunks = _split_oversized_statement(stmt, version)
+            chunks = _split_oversized_statement(stmt, version, catalog)
             for chunk_doc in chunks:
                 result.extend(chunk_doc.statement)
         else:
@@ -96,23 +121,108 @@ def _expand_oversized_statements(stmts: list[Statement], version: str) -> list[S
     return result
 
 
-def _split_oversized_statement(stmt: Statement, version: str) -> list[ScpDocument]:
+def _split_oversized_statement(
+    stmt: Statement,
+    version: str,
+    catalog: ActionCatalog | None,
+) -> list[ScpDocument]:
     """Split a single statement that is too large to fit in one SCP.
 
     Attempts to split the ``Action`` list first (when ``Action`` is used,
-    not ``NotAction``), then falls back to splitting the ``Resource`` list.
-    Raises ``SplitError`` when neither list can be split further.
+    not ``NotAction``), then — when *catalog* is non-empty — a ``Deny`` +
+    ``NotAction`` statement by expanding to denied catalog atoms and
+    chunking as ``Action`` lists, then falls back to splitting the
+    ``Resource`` list.
+
+    Raises ``SplitError`` when no strategy applies or a single list element
+    still exceeds the byte limit.
     """
-    # Prefer splitting Action (not NotAction — semantic inversion makes it unsafe).
     if stmt.not_action is None and len(stmt.action_list) > 1:
         return _split_by_field(stmt, "action", stmt.action_list, version)
-    # Fallback: split Resource.
+    if (
+        stmt.effect == "Deny"
+        and stmt.not_action is not None
+        and catalog is not None
+        and not catalog.is_empty()
+    ):
+        not_action_chunks = _split_oversized_deny_not_action_via_catalog(stmt, version, catalog)
+        if not_action_chunks is not None:
+            return not_action_chunks
     if len(stmt.resource_list) > 1:
         return _split_by_field(stmt, "resource", stmt.resource_list, version)
     raise SplitError(
-        f"Statement cannot be split further: Action and Resource are both "
-        f"scalars but the statement still exceeds {MAX_SCP_SIZE_BYTES:,} bytes."
+        f"Statement cannot be split further: no splittable Action / NotAction(catalog) / "
+        f"Resource list, yet the statement still exceeds {MAX_SCP_SIZE_BYTES:,} bytes."
     )
+
+
+def _split_oversized_deny_not_action_via_catalog(
+    stmt: Statement,
+    version: str,
+    catalog: ActionCatalog,
+) -> list[ScpDocument] | None:
+    """If *stmt* is ``Deny`` + ``NotAction`` and too large, split using catalog denied atoms.
+
+    Returns ``None`` when this strategy does not apply (caller tries
+    ``Resource`` splitting).  Raises :class:`SplitError` when the statement is
+    clearly oversized but the implied deny set cannot be materialised
+    (expansion error, or every catalog action is exempt while JSON remains
+    oversized).
+    """
+    single = ScpDocument(version=version, statement=[stmt])
+    if single.size_bytes <= MAX_SCP_SIZE_BYTES:
+        return None
+
+    try:
+        denied_sorted = sorted(_deny_not_action_statement_atoms(stmt, catalog))
+    except ValueError as exc:
+        raise SplitError(str(exc)) from exc
+
+    if not denied_sorted:
+        raise SplitError(
+            "This Deny+NotAction statement is larger than the SCP byte limit, but under "
+            "the configured action catalog it exempts every action — the remaining bulk "
+            "cannot be reduced by catalog-backed splitting. Add Resource list splitting, "
+            "use a smaller exemption list, or supply a wider catalog."
+        )
+
+    return _split_by_denied_action_atoms(stmt, version, denied_sorted)
+
+
+def _split_by_denied_action_atoms(
+    stmt: Statement,
+    version: str,
+    denied_sorted: list[str],
+) -> list[ScpDocument]:
+    """Greedy-chunk *denied_sorted* into ``Deny`` + ``Action`` statements (clears ``NotAction``)."""
+    docs: list[ScpDocument] = []
+    remaining = list(denied_sorted)
+
+    while remaining:
+        chunk: list[str] = []
+        for item in remaining:
+            trial = [*chunk, item]
+            trial_val: list[str] | str = trial[0] if len(trial) == 1 else trial
+            trial_stmt = stmt.model_copy(update={"action": trial_val, "not_action": None})
+            trial_doc = ScpDocument(version=version, statement=[trial_stmt])
+            if trial_doc.size_bytes <= MAX_SCP_SIZE_BYTES:
+                chunk = trial
+            else:
+                break
+
+        if not chunk:
+            raise SplitError(
+                "A single catalog action in this Deny+NotAction expansion produces a "
+                f"statement that exceeds {MAX_SCP_SIZE_BYTES:,} bytes and cannot be split "
+                "further."
+            )
+
+        chunk_val: list[str] | str = chunk[0] if len(chunk) == 1 else chunk
+        chunk_stmt = stmt.model_copy(update={"action": chunk_val, "not_action": None})
+        docs.append(ScpDocument(version=version, statement=[chunk_stmt]))
+        remaining = remaining[len(chunk) :]
+
+    return docs
 
 
 def _split_by_field(

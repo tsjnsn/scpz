@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the optimized (or other) policy did not broaden permissions versus a
   baseline: ``Deny`` coverage must not shrink and ``Allow`` carve-outs must not
   grow, grouped by effect, condition fingerprint, and resources.
+- `split_if_needed(..., catalog=...)` expands oversized `Deny` + `NotAction`
+  statements using the action catalog: denied atoms are re-encoded as chunked
+  `Deny` + `Action` lists so split output is permission-equivalent (no list
+  partitioning of exemptions, which would broaden denies).
 - Opt-in `redundancyEliminate` pass: when a non-empty action catalog is
   configured, wholly redundant ``Deny`` + ``NotAction`` statements are removed
   using the same catalog-backed exemption model as ``NotAction`` compression
