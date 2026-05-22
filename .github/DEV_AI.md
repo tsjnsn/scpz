@@ -40,9 +40,9 @@ That is unrelated to test failures; regular CI on the PR head may already be gre
    That ruleset:
 
    - Applies only to `refs/heads/dev-ai`
-   - Blocks branch deletion and force-push
-   - Grants **Copilot SWE Agent** (GitHub App id `1143301`) bypass so the coding agent can push
-   - Does **not** require status checks before push
+   - Blocks branch deletion and force-push for **everyone** (including Copilot)
+   - Does **not** require status checks before push, so the coding agent can land commits
+     without GH006 from “checks expected before the push”
 
 3. Or apply via CLI (admin token):
 
@@ -61,8 +61,9 @@ On the **pull request** (or on `main` / merge queue), require the CI jobs from
 
 Add **Equivalence golden regression** when that job is required for merges.
 
-Copilot can push to `dev-ai` without those checks having already run on its new commit; the
-PR into `main` still must go green before merge.
+Copilot can push to `dev-ai` without those checks having already run on its new commit
+because `dev-ai` itself does not require them before push; the PR into `main` still must go
+green before merge.
 
 ### 3. Enable Copilot coding agent on this repository
 
@@ -76,9 +77,10 @@ head branch (`dev-ai`).
 - Do **not** require the same status checks on direct pushes to `dev-ai` if you want Copilot
   to land fixes on the open PR without a second PR.
 - Do **not** expect a separate `copilot/*` PR unless you intentionally want that flow; for
-  `dev-ai` → `main`, configure bypass/light rules on `dev-ai` instead.
+  `dev-ai` → `main`, configure a light ruleset on `dev-ai` instead (for example this repo’s
+  importable ruleset).
 
 ## References
 
-- [Configure Copilot coding agent as a bypass actor for rulesets](https://github.blog/changelog/2025-11-13-configure-copilot-coding-agent-as-a-bypass-actor-for-rulesets/)
+- [About rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)
 - [About GitHub Copilot coding agent](https://docs.github.com/en/copilot/concepts/agents/coding-agent/about-coding-agent)
