@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from scpz.catalog import ActionCatalog
 from scpz.models import Statement
 from scpz.optimizations.redundancy import _covers, eliminate_redundancy
 
@@ -123,12 +124,23 @@ class TestEliminateRedundancy:
         result = eliminate_redundancy([s3, iam])
         assert len(result) == 2
 
-    def test_not_action_skipped(self) -> None:
-        """NotAction statements are not analysed and always kept."""
+    def test_not_action_skipped_without_catalog(self) -> None:
+        """NotAction pairs are not merged without a catalog (and Action is not mixed)."""
         not_action = Statement(effect="Deny", not_action="s3:GetObject", resource="*")
         regular = Statement(effect="Deny", action="*", resource="*")
         result = eliminate_redundancy([not_action, regular])
         # NotAction stmt is kept even though regular Deny * subsumes it logically
+        assert len(result) == 2
+
+    def test_not_action_pair_skipped_without_catalog(self) -> None:
+        """Broader-exemption NotAction is kept when no catalog proves subsumption."""
+        broad = Statement(
+            effect="Deny",
+            not_action=["s3:GetObject", "s3:PutObject"],
+            resource="*",
+        )
+        narrow = Statement(effect="Deny", not_action="s3:GetObject", resource="*")
+        result = eliminate_redundancy([broad, narrow])
         assert len(result) == 2
 
     def test_single_statement_unchanged(self) -> None:
@@ -166,3 +178,73 @@ class TestEliminateRedundancy:
         stmts = [deny("iam:DeleteRole") for _ in range(n)]
         result = eliminate_redundancy(stmts)
         assert len(result) == 1
+
+
+# ── NotAction + catalog ───────────────────────────────────────────────
+
+
+class TestEliminateRedundancyNotActionCatalog:
+    """Catalog-backed ``NotAction`` subsumption (``redundancyEliminate`` + catalog)."""
+
+    def _cat_s3_rw(self) -> ActionCatalog:
+        return ActionCatalog.from_dict(
+            {
+                "s3": [
+                    "GetObject",
+                    "PutObject",
+                    "DeleteObject",
+                    "ListBucket",
+                ],
+            },
+        )
+
+    def test_broader_exemptions_removed(self) -> None:
+        """Statement with strictly larger exemption set is dropped (deny is weaker)."""
+        broad = Statement(
+            effect="Deny",
+            not_action=["s3:GetObject", "s3:PutObject"],
+            resource="*",
+        )
+        narrow = Statement(effect="Deny", not_action="s3:GetObject", resource="*")
+        catalog = self._cat_s3_rw()
+        result = eliminate_redundancy([broad, narrow], catalog=catalog)
+        assert len(result) == 1
+        assert result[0] is narrow
+
+    def test_identical_not_action_deduped(self) -> None:
+        a = Statement(effect="Deny", not_action=["s3:GetObject"], resource="*")
+        b = Statement(effect="Deny", not_action=["s3:GetObject"], resource="*")
+        catalog = self._cat_s3_rw()
+        result = eliminate_redundancy([a, b], catalog=catalog)
+        assert len(result) == 1
+
+    def test_different_condition_not_action_both_kept(self) -> None:
+        conditioned = Statement(
+            effect="Deny",
+            not_action="s3:GetObject",
+            resource="*",
+            condition={"StringEquals": {"aws:RequestedRegion": "us-east-1"}},
+        )
+        plain = Statement(effect="Deny", not_action="s3:GetObject", resource="*")
+        result = eliminate_redundancy([conditioned, plain], catalog=self._cat_s3_rw())
+        assert len(result) == 2
+
+    def test_wildcard_subsumes_explicit_same_exemptions(self) -> None:
+        """``iam:Get*`` exempts the same catalog Get* actions as explicit pairs."""
+        catalog = ActionCatalog.from_dict({"iam": ["GetRole", "GetUser", "DeleteRole"]})
+        explicit = Statement(
+            effect="Deny",
+            not_action=["iam:GetRole", "iam:GetUser"],
+            resource="*",
+        )
+        wildcard = Statement(effect="Deny", not_action="iam:Get*", resource="*")
+        result = eliminate_redundancy([explicit, wildcard], catalog=catalog)
+        assert len(result) == 1
+        assert result[0] is wildcard
+
+    def test_empty_catalog_skips_not_action(self) -> None:
+        catalog = ActionCatalog.empty()
+        a = Statement(effect="Deny", not_action="s3:GetObject", resource="*")
+        b = Statement(effect="Deny", not_action=["s3:GetObject", "s3:PutObject"], resource="*")
+        result = eliminate_redundancy([a, b], catalog=catalog)
+        assert len(result) == 2

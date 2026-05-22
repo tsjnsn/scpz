@@ -176,7 +176,7 @@ def _run_passes_once(
     # 5. Redundancy elimination
     if passes_cfg.redundancyEliminate.enabled:
         before = len(stmts)
-        stmts = eliminate_redundancy(stmts)
+        stmts = eliminate_redundancy(stmts, catalog=catalog)
         if len(stmts) < before:
             applied.append("redundancy-eliminate")
 
