@@ -254,7 +254,7 @@ class TestEliminateRedundancyNotActionCatalog:
         assert len(result) == 1
         assert result[0] is narrow
 
-    def test_service_prefix_case_is_ignored_for_catalog_matching(self) -> None:
+    def test_service_prefix_case_is_normalized_for_catalog_matching(self) -> None:
         narrow = Statement(effect="Deny", not_action="s3:GetObject", resource="*")
         broader = Statement(
             effect="Deny",

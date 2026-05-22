@@ -78,10 +78,10 @@ def eliminate_redundancy(
     Runs in O(n²) over the statement list for ``Action`` statements. With a
     non-empty *catalog*, each ``NotAction``-pair comparison also scans the
     catalog and the pair's exemption patterns, so the worst case becomes
-    O(n² × c × p), where *c* is the number of catalog actions and *p* is the
-    number of ``NotAction`` patterns checked for the pair. This remains
-    acceptable given the AWS limit of 5 statements per SCP. When two
-    statements are identical both are compared against each other; the
+    O(n² × c × p), where *c* is the number of catalog actions and *p* is
+    ``max(len(a.not_action_list), len(b.not_action_list))`` for the compared
+    pair. This remains acceptable given the AWS limit of 5 statements per SCP.
+    When two statements are identical both are compared against each other; the
     algorithm keeps the later one and discards the earlier, leaving exactly
     one copy.
 
@@ -177,7 +177,9 @@ def _normalize_action_match_term(action: str) -> str:
 
     AWS treats IAM service prefixes case-insensitively, so this lowercases only
     the prefix before ``:`` and preserves the action-name portion for glob
-    matching against literal catalog actions.
+    matching against literal catalog actions. Terms without ``:`` (for example
+    ``*`` or malformed inputs) are returned unchanged so this helper only
+    rewrites well-formed ``service:name`` patterns.
     """
     if action == "*" or ":" not in action:
         return action
