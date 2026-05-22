@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the optimized (or other) policy did not broaden permissions versus a
   baseline: ``Deny`` coverage must not shrink and ``Allow`` carve-outs must not
   grow, grouped by effect, condition fingerprint, and resources.
+- Opt-in `redundancyEliminate` pass: when a non-empty action catalog is
+  configured, wholly redundant ``Deny`` + ``NotAction`` statements are removed
+  using the same catalog-backed exemption model as ``NotAction`` compression
+  (*exempt(B) ⊆ exempt(A)* in the catalog universe).
 - `spec.validation` in `scpz.yaml` with per-rule severities (`error`, `warn`,
   `ignore`) for wildcard actions, broad `Resource: "*"`, missing `Sid`, and
   unknown service prefixes. Wildcard actions use `onWildcardAction`: the

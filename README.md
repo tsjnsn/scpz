@@ -76,7 +76,7 @@ scpz runs the following optimizations in order, repeating until the output stops
 2. **Action wildcard compression** — Replaces groups of actions sharing a common prefix with wildcard patterns (e.g. `s3:GetObject` + `s3:GetBucketPolicy` → `s3:Get*`). Uses the bundled AWS action catalog in conservative mode to avoid scope broadening.
 3. **Condition merging** — Deduplicates condition values and merges equivalent condition blocks.
 4. **Resource ARN optimization** — Collapses multiple specific ARNs into wildcard patterns (e.g. `role/Admin` + `role/ReadOnly` → `role/*`).
-5. **Redundancy elimination** _(opt-in)_ — Removes statements wholly subsumed by another statement in the same policy. Enable with `redundancyEliminate.enabled: true` in `scpz.yaml`.
+5. **Redundancy elimination** _(opt-in)_ — Removes statements wholly subsumed by another statement in the same policy (`Action` via wildcards; `NotAction` only when a non-empty action catalog is configured, mirroring catalog safety for `NotAction` compression). Enable with `redundancyEliminate.enabled: true` in `scpz.yaml`.
 
 When a policy still exceeds limits after optimization, scpz automatically splits it into multiple SCP documents (up to 10 per target).
 

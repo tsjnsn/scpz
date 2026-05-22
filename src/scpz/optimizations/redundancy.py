@@ -7,15 +7,34 @@ already covers everything A covers:
   - Same Condition (semantically equal)
   - Same Resource set (exact match)
   - Every action in A is covered by at least one action in B
+    (for ``Action`` statements)
 
-Wildcard awareness (no catalog required):
+Wildcard awareness for ``Action`` (no catalog required):
 
   - ``*`` covers every action.
   - ``svc:Verb*`` covers any action that starts with ``svc:Verb``, including
     other wildcard patterns such as ``svc:VerbFoo*``.
 
-NotAction statements are skipped — subsumption logic inverts for NotAction
-and safely handling it requires a full action catalog.
+``NotAction`` (Deny-with-exemptions)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For ``Deny`` + ``NotAction``, an action is *not* denied when it matches any
+exemption pattern; otherwise it is denied.  Let *exempt(S)* be the set of IAM
+actions matched by statement S's ``NotAction`` list.
+
+Statement A (``NotAction``) is subsumed by statement B (``NotAction``) when
+*exempt(B) ⊆ exempt(A)* — equivalently *denied(A) ⊆ denied(B)*: every action
+denied by A is already denied by B.  Intuitively B has the same or tighter
+exemptions, so B's deny is the same or stronger.
+
+Because wildcards in ``NotAction`` expand exemption sets in non-obvious ways,
+``NotAction`` subsumption is evaluated only against a **non-empty**
+:class:`~scpz.catalog.ActionCatalog`: for every catalog action that B exempts,
+the catalog must show that A exempts it too.  Without a catalog, ``NotAction``
+pairs are never removed (same conservative stance as ``actionCompress`` on
+``NotAction``).
+
+``Action`` and ``NotAction`` statements are never compared to each other for
+subsumption.
 
 Example::
 
@@ -28,45 +47,73 @@ Example::
     A: Deny s3:* on * if PrincipalArn == admin
     B: Deny s3:* on * (no condition)
     → both kept (different scope).
+
+``NotAction`` example (catalog must list the named actions)::
+
+    A: Deny NotAction [s3:GetObject, s3:PutObject] on *
+    B: Deny NotAction [s3:GetObject]             on *
+    → A is removed (B exempts only GetObject; A exempts that and more, so
+       everything A denies is already denied by B).
 """
 
 from __future__ import annotations
 
+from fnmatch import fnmatchcase
 from typing import TYPE_CHECKING
 
 from scpz.optimizations.conditions import conditions_equal
 
 if TYPE_CHECKING:
+    from scpz.catalog import ActionCatalog
     from scpz.models import Statement
 
 
-def eliminate_redundancy(statements: list[Statement]) -> list[Statement]:
+def eliminate_redundancy(
+    statements: list[Statement],
+    *,
+    catalog: ActionCatalog | None = None,
+) -> list[Statement]:
     """Remove statements wholly subsumed by another statement in *statements*.
 
-    Runs in O(n²) over the statement list — acceptable given the AWS limit of
-    5 statements per SCP.  When two statements are identical both are compared
-    against each other; the algorithm keeps the later one and discards the
-    earlier, leaving exactly one copy.
+    Runs in O(n^2) over the statement list for ``Action`` statements. With a
+    non-empty *catalog*, each ``NotAction``-pair comparison also scans the
+    catalog and the pair's exemption patterns, so the worst case becomes
+    O(n^2 x c x p), where *c* is the number of catalog actions and *p* is
+    ``max(len(a.not_action_list), len(b.not_action_list))`` for the compared
+    pair. This remains acceptable given the AWS limit of 5 statements per SCP.
+    When two statements are identical both are compared against each other; the
+    algorithm keeps the later one and discards the earlier, leaving exactly
+    one copy.
+
+    When *catalog* is non-empty, ``NotAction`` statements participate: see
+    module docstring.  With no catalog (or an empty one), ``NotAction`` pairs
+    are never eliminated.
     """
     if len(statements) <= 1:
         return statements
+
+    catalog_ok = catalog is not None and not catalog.is_empty()
 
     redundant: set[int] = set()
 
     for i, a in enumerate(statements):
         if i in redundant:
             continue
-        # Skip NotAction — subsumption logic inverts and requires a catalog.
-        if a.not_action is not None:
-            continue
         for j, b in enumerate(statements):
             if i == j or j in redundant:
                 continue
-            if b.not_action is not None:
+            if a.not_action is None and b.not_action is not None:
                 continue
-            if _is_subsumed_by(a, b):
-                redundant.add(i)
-                break
+            if a.not_action is not None and b.not_action is None:
+                continue
+            if a.not_action is None and b.not_action is None:
+                if _is_subsumed_by(a, b):
+                    redundant.add(i)
+                    break
+            else:
+                if catalog_ok and catalog is not None and _not_action_subsumed_by(a, b, catalog):
+                    redundant.add(i)
+                    break
 
     return [s for idx, s in enumerate(statements) if idx not in redundant]
 
@@ -88,8 +135,60 @@ def _is_subsumed_by(a: Statement, b: Statement) -> bool:
     )
 
 
+def _not_action_subsumed_by(a: Statement, b: Statement, catalog: ActionCatalog) -> bool:
+    """Return True if ``NotAction`` *a* is wholly subsumed by ``NotAction`` *b*.
+
+    Requires *exempt(b) ⊆ exempt(a)* for every action in *catalog* (see module
+    docstring).  Call only when *catalog* is non-empty and both statements use
+    ``NotAction``.
+    """
+    if a.effect != b.effect:
+        return False
+    if not conditions_equal(a.condition, b.condition):
+        return False
+    if _normalise_resource(a.resource) != _normalise_resource(b.resource):
+        return False
+    na_a = _normalize_action_patterns(a.not_action_list)
+    na_b = _normalize_action_patterns(b.not_action_list)
+    for full in catalog.iter_full_actions():
+        normalized_full = _normalize_action_match_term(full)
+        if _matches_not_action_patterns(normalized_full, na_b) and not _matches_not_action_patterns(
+            normalized_full, na_a
+        ):
+            return False
+    return True
+
+
+def _matches_not_action_patterns(normalized_action: str, patterns: list[str]) -> bool:
+    """True when a normalized catalog action matches any normalized patterns."""
+    return any(fnmatchcase(normalized_action, pattern) for pattern in patterns)
+
+
+def _normalize_action_patterns(patterns: list[str]) -> list[str]:
+    """Normalize IAM action patterns for catalog-backed matching."""
+    return [_normalize_action_match_term(pattern) for pattern in patterns]
+
+
+def _normalize_action_match_term(action: str) -> str:
+    """Normalize an IAM action string for catalog-backed matching.
+
+    AWS treats IAM service prefixes case-insensitively, so this lowercases only
+    the prefix before ``:`` and preserves the action-name portion for glob
+    matching against literal catalog actions. Terms without ``:`` (for example
+    ``*`` or malformed inputs) are returned unchanged so this helper only
+    rewrites well-formed ``service:name`` patterns.
+    """
+    if ":" not in action:
+        return action
+    service, _, name = action.partition(":")
+    return f"{service.lower()}:{name}"
+
+
 def _covers(covering: str, action: str) -> bool:
     """Return True if *covering* covers *action*.
+
+    Used for ``Action`` subsumption checks. Catalog-backed ``NotAction`` checks
+    use glob-style matching against literal catalog actions instead.
 
     ``*``            covers everything.
     ``svc:Verb*``    covers ``svc:VerbFoo``, ``svc:VerbFoo*``, etc.
