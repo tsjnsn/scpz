@@ -51,13 +51,13 @@ Published to [GitHub Container Registry](https://github.com/tsjnsn/scpz/pkgs/con
 Example (optimize a policy file in the current directory):
 
 ```bash
-docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.io/tsjnsn/scpz:latest optimize-cmd policy.json
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.io/tsjnsn/scpz:latest optimize policy.json
 ```
 
 With Podman:
 
 ```bash
-podman run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work:z" ghcr.io/tsjnsn/scpz:latest optimize-cmd policy.json
+podman run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work:z" ghcr.io/tsjnsn/scpz:latest optimize policy.json
 ```
 
 #### Docker Hub
@@ -68,7 +68,7 @@ Published to [Docker Hub](https://hub.docker.com/r/tsjnsn/scpz) as `tsjnsn/scpz`
 # Pin to a release (recommended in production)
 docker pull tsjnsn/scpz:v0.3.0
 
-docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" tsjnsn/scpz:v0.3.0 optimize-cmd policy.json --dry-run
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" tsjnsn/scpz:v0.3.0 optimize policy.json --dry-run
 ```
 
 #### Build locally
@@ -95,22 +95,22 @@ Ensure the Docker Hub repository **`tsjnsn/scpz`** exists before the first push.
 
 ```bash
 # Optimize a single file in-place (original saved as policy.json.bak)
-scpz optimize-cmd policy.json
+scpz optimize policy.json
 
 # Optimize all JSON files in a directory
-scpz optimize-cmd policies/
+scpz optimize policies/
 
 # Dry run — show diff + summary without writing
-scpz optimize-cmd policy.json --dry-run
+scpz optimize policy.json --dry-run
 
 # Summary only — just show what would change
-scpz optimize-cmd policy.json --summary-only
+scpz optimize policy.json --summary-only
 
 # Write to a different file
-scpz optimize-cmd policy.json --output optimized.json
+scpz optimize policy.json --output optimized.json
 
 # Error instead of auto-splitting
-scpz optimize-cmd policy.json --no-split
+scpz optimize policy.json --no-split
 ```
 
 ### Validate
@@ -121,6 +121,13 @@ scpz validate policy.json
 
 # Validate all JSON files in a directory
 scpz validate policies/
+```
+
+### Check equivalence
+
+```bash
+# Verify optimized policy did not broaden permissions
+scpz check-equivalence before.json after.json
 ```
 
 ## Optimization Passes
@@ -154,7 +161,7 @@ spec:
 
 ```bash
 # Print the JSON Schema for editor validation
-scpz schema
+scpz print-schema
 ```
 
 ## Development
@@ -173,7 +180,7 @@ uv run pytest --cov=scpz
 uv run pytest tests/test_actions.py -v
 
 # Regenerate the committed schema after model changes
-uv run scpz schema -o schema/OptimizerConfig.json
+uv run scpz print-schema -o schema/OptimizerConfig.json
 ```
 
 ## License

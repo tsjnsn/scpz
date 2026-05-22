@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** Redesigned CLI to a flat, verb-first command surface (no backward-compatibility aliases):
+  - `optimize-cmd` → `optimize`
+  - `schema` → `print-schema`
+  - `validate` and `check-equivalence` unchanged
+- Normalized help: `-h` / `--help`, consistent option help text, plain markup in help output.
+
 ### Added
 
 - Public documentation site built with MkDocs Material, deployed to GitHub Pages via `.github/workflows/pages.yml` (enable **Settings → Pages → GitHub Actions** on first use).

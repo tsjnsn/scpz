@@ -24,11 +24,14 @@ from scpz.validator import Severity, ValidationResult, validate_document, valida
 if TYPE_CHECKING:
     from scpz.models import ScpDocument
 
+_CLI_CONTEXT = {"help_option_names": ["-h", "--help"]}
+
 app = typer.Typer(
     name="scpz",
-    help="Intelligently optimize AWS SCP JSONs.",
+    help="Optimize and validate AWS Service Control Policy (SCP) JSON.",
     no_args_is_help=True,
     add_completion=False,
+    context_settings=_CLI_CONTEXT,
 )
 console = Console(stderr=True)
 out = Console()
@@ -40,7 +43,7 @@ def version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
-@app.callback()
+@app.callback(context_settings=_CLI_CONTEXT)
 def main(
     version: bool = typer.Option(
         False,
@@ -51,25 +54,25 @@ def main(
         is_eager=True,
     ),
 ) -> None:
-    """scpz — Intelligently optimize AWS SCP JSONs."""
+    """Optimize and validate AWS Service Control Policy (SCP) JSON."""
 
 
-# ── optimize command ─────────────────────────────────────────────────
+# ── optimize ─────────────────────────────────────────────────────────
 
 
-@app.command()
-def optimize_cmd(
+@app.command("optimize", context_settings=_CLI_CONTEXT)
+def optimize_command(
     path: Path = typer.Argument(..., help="SCP JSON file or directory of JSON files."),
     output: Path | None = typer.Option(
         None,
         "--output",
         "-o",
-        help="Output path. Defaults to in-place with .bak backup.",
+        help="Write optimized JSON here (default: in-place with .bak backup).",
     ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        help="Show diff + summary without writing.",
+        help="Show diff and summary without writing files.",
     ),
     summary_only: bool = typer.Option(
         False,
@@ -79,10 +82,10 @@ def optimize_cmd(
     no_split: bool = typer.Option(
         False,
         "--no-split",
-        help="Error instead of splitting into multiple SCPs.",
+        help="Exit with error instead of splitting into multiple SCPs.",
     ),
 ) -> None:
-    """Optimize SCP JSON file(s) to fit within AWS limits."""
+    """Optimize SCP JSON to fit AWS Organizations limits."""
     files = _resolve_files(path)
     if not files:
         console.print("[red]No JSON files found.[/red]")
@@ -227,19 +230,19 @@ def _handle_split_output(
             console.print(f"  → wrote {out_path}")
 
 
-# ── schema command ───────────────────────────────────────────────────
+# ── print-schema ─────────────────────────────────────────────────────
 
 
-@app.command("schema")
-def schema_cmd(
+@app.command("print-schema", context_settings=_CLI_CONTEXT)
+def print_schema_command(
     output: Path | None = typer.Option(
         None,
         "--output",
         "-o",
-        help="Write schema to a file instead of stdout.",
+        help="Write schema to this file (default: stdout).",
     ),
 ) -> None:
-    """Print the JSON Schema for scpz.yaml to stdout."""
+    """Print the JSON Schema for scpz.yaml."""
     schema = OptimizerConfig.model_json_schema()
     # Annotate with $schema and $id so editors (e.g. VS Code YAML extension)
     # can resolve and apply the schema automatically.
@@ -258,14 +261,14 @@ def schema_cmd(
         sys.stdout.write(text)
 
 
-# ── validate command ─────────────────────────────────────────────────
+# ── validate ───────────────────────────────────────────────────────
 
 
-@app.command("validate")
-def validate_cmd(
+@app.command("validate", context_settings=_CLI_CONTEXT)
+def validate_command(
     path: Path = typer.Argument(..., help="SCP JSON file or directory of JSON files."),
 ) -> None:
-    """Validate SCP JSON file(s) without modifying them."""
+    """Validate SCP JSON without modifying files."""
     files = _resolve_files(path)
     if not files:
         console.print("[red]No JSON files found.[/red]")
@@ -284,15 +287,15 @@ def validate_cmd(
     console.print("[green]✓ All files are valid.[/green]")
 
 
-# ── check-equivalence command ───────────────────────────────────────
+# ── check-equivalence ──────────────────────────────────────────────────
 
 
-@app.command("check-equivalence")
-def check_equivalence_cmd(
+@app.command("check-equivalence", context_settings=_CLI_CONTEXT)
+def check_equivalence_command(
     before: Path = typer.Argument(..., help="SCP JSON before optimization."),
     after: Path = typer.Argument(..., help="SCP JSON after optimization."),
 ) -> None:
-    """Verify that *after* did not broaden permissions versus *before* (catalog model)."""
+    """Verify after did not broaden permissions versus before."""
     if not before.is_file():
         console.print(f"[red]File not found:[/red] {before}")
         raise typer.Exit(code=1)
