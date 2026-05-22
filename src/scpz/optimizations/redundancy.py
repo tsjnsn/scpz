@@ -161,7 +161,10 @@ def _not_action_subsumed_by(a: Statement, b: Statement, catalog: ActionCatalog) 
 def _exempted_by_not_action_list(full_action: str, patterns: list[str]) -> bool:
     """True when *full_action* matches any ``NotAction`` exemption *patterns*."""
     normalized_action = _normalize_action_match_term(full_action)
-    return any(fnmatchcase(normalized_action, pattern) for pattern in patterns)
+    for pattern in patterns:
+        if fnmatchcase(normalized_action, pattern):
+            return True
+    return False
 
 
 def _normalize_action_patterns(patterns: list[str]) -> list[str]:
@@ -170,7 +173,12 @@ def _normalize_action_patterns(patterns: list[str]) -> list[str]:
 
 
 def _normalize_action_match_term(action: str) -> str:
-    """Normalize an IAM action string for catalog-backed matching."""
+    """Normalize an IAM action string for catalog-backed matching.
+
+    AWS treats IAM service prefixes case-insensitively, so this lowercases only
+    the prefix before ``:`` and preserves the action-name portion for glob
+    matching against literal catalog actions.
+    """
     if action == "*" or ":" not in action:
         return action
     service, _, name = action.partition(":")
