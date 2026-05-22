@@ -34,6 +34,34 @@ Or with [uv](https://docs.astral.sh/uv/) (recommended):
 uv tool install scpz
 ```
 
+### Container (GitHub Container Registry)
+
+Images are built from this repository’s `Dockerfile` (compatible with Docker and Podman) and published to [GitHub Container Registry](https://github.com/tsjnsn/scpz/pkgs/container/scpz) when a [GitHub Release](https://github.com/tsjnsn/scpz/releases) is published.
+
+Tagging:
+
+- **`ghcr.io/tsjnsn/scpz:<release-tag>`** — always pushed for every published release (for example `v0.2.7`).
+- **`ghcr.io/tsjnsn/scpz:latest`** — updated only for **stable** releases (not GitHub pre-releases).
+
+Example (optimize a policy file in the current directory):
+
+```bash
+docker run --rm -v "$PWD:/work" ghcr.io/tsjnsn/scpz:latest optimize-cmd policy.json
+```
+
+With Podman:
+
+```bash
+podman run --rm -v "$PWD:/work:z" ghcr.io/tsjnsn/scpz:latest optimize-cmd policy.json
+```
+
+To build locally:
+
+```bash
+docker build -t scpz:local .
+docker run --rm scpz:local --version
+```
+
 ## Usage
 
 ### Optimize
