@@ -99,6 +99,13 @@ def conditions_equal(
     return _normalise_condition(a) == _normalise_condition(b)
 
 
+def condition_fingerprint(cond: dict[str, dict[str, Any]] | None) -> str:
+    """Return a stable string key for partitioning statements by condition semantics."""
+    if cond is None:
+        return ""
+    return _normalise_condition(cond)
+
+
 def _normalise_condition(cond: dict[str, dict[str, Any]]) -> str:
     """Produce a canonical JSON string for comparison."""
     normalised: dict[str, dict[str, Any]] = {}
