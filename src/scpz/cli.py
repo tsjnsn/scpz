@@ -17,18 +17,24 @@ from scpz import __version__
 from scpz.catalog import ActionCatalog
 from scpz.config import SUPPORTED_API_VERSION, SUPPORTED_KIND, OptimizerConfig
 from scpz.equivalence import check_permission_equivalence
-from scpz.optimizer import OptimizationResult, optimize
+from scpz.optimizer import OptimizationResult
+from scpz.optimizer import optimize as run_optimize
 from scpz.splitter import SplitError, split_if_needed
 from scpz.validator import Severity, ValidationResult, validate_document, validate_file
 
 if TYPE_CHECKING:
     from scpz.models import ScpDocument
 
+_APP_HELP = "Optimize and validate AWS Service Control Policy (SCP) JSON for Organizations limits."
+_EPILOG = "Run `scpz <command> --help` for command-specific options."
+
 app = typer.Typer(
     name="scpz",
-    help="Intelligently optimize AWS SCP JSONs.",
+    help=_APP_HELP,
+    epilog=_EPILOG,
     no_args_is_help=True,
     add_completion=False,
+    rich_markup_mode="rich",
 )
 console = Console(stderr=True)
 out = Console()
@@ -46,64 +52,91 @@ def main(
         False,
         "--version",
         "-V",
-        help="Show version and exit.",
+        help="Print version information and exit.",
         callback=version_callback,
         is_eager=True,
     ),
 ) -> None:
-    """scpz — Intelligently optimize AWS SCP JSONs."""
+    """Optimize and validate AWS Service Control Policy (SCP) JSON."""
 
 
-# ── optimize command ─────────────────────────────────────────────────
+# ── optimize ─────────────────────────────────────────────────────────
 
 
-@app.command()
-def optimize_cmd(
-    path: Path = typer.Argument(..., help="SCP JSON file or directory of JSON files."),
+@app.command("optimize")
+def optimize(
+    path: Path = typer.Argument(
+        ...,
+        help="SCP JSON file or directory containing *.json policies.",
+        metavar="PATH",
+    ),
     output: Path | None = typer.Option(
         None,
         "--output",
         "-o",
-        help="Output path. Defaults to in-place with .bak backup.",
+        help=(
+            "Destination for optimized JSON (in-place when omitted). For a single input "
+            "file: paths ending in .json name one output file (an existing directory "
+            "always uses directory semantics); otherwise --output is a directory and "
+            "writes <output>/<input filename> (or <stem>_N.json when splitting). When "
+            "PATH is a directory of policies, --output must be a directory."
+        ),
     ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        help="Show diff + summary without writing.",
+        help="Print summary and unified diff; do not write files.",
     ),
     summary_only: bool = typer.Option(
         False,
         "--summary-only",
-        help="Show optimization summary only (no diff).",
+        help="Print optimization summary only; do not write files (no diff).",
     ),
     no_split: bool = typer.Option(
         False,
         "--no-split",
-        help="Error instead of splitting into multiple SCPs.",
+        help="Exit with an error if the policy still exceeds limits after optimization.",
     ),
 ) -> None:
-    """Optimize SCP JSON file(s) to fit within AWS limits."""
+    """Optimize SCP JSON to fit AWS Organizations size and statement limits."""
     files = _resolve_files(path)
     if not files:
         console.print("[red]No JSON files found.[/red]")
         raise typer.Exit(code=1)
 
+    write_output = not dry_run and not summary_only
+    if output is not None:
+        _validate_output_path_kind(output)
+    is_batch = path.is_dir()
+    if is_batch and output is not None:
+        _require_output_directory(
+            output,
+            reason="PATH is a directory",
+            create=write_output,
+        )
+
     exit_code = 0
     for file_path in files:
+        file_output = output
+        split_output_dir = output
+        if is_batch and output is not None:
+            file_output = output / file_path.name
         try:
             _optimize_file(
                 file_path,
-                output=output,
+                output=file_output,
+                split_output_dir=split_output_dir,
                 dry_run=dry_run,
                 summary_only=summary_only,
                 no_split=no_split,
             )
-        except (SplitError, typer.Exit) as exc:
-            if isinstance(exc, SplitError):
-                console.print(f"[red]Error:[/red] {exc}")
-                exit_code = 1
-            else:
-                raise
+        except SplitError as exc:
+            console.print(f"[red]Error:[/red] {exc}")
+            exit_code = 1
+        except typer.Exit as exc:
+            code = exc.exit_code if exc.exit_code is not None else 0
+            if code != 0:
+                exit_code = max(exit_code, code)
 
     if exit_code != 0:
         raise typer.Exit(code=exit_code)
@@ -113,6 +146,7 @@ def _optimize_file(
     file_path: Path,
     *,
     output: Path | None,
+    split_output_dir: Path | None = None,
     dry_run: bool,
     summary_only: bool,
     no_split: bool,
@@ -134,7 +168,7 @@ def _optimize_file(
         raise typer.Exit(code=1)
 
     # Optimize
-    result = optimize(doc, config=cfg)
+    result = run_optimize(doc, config=cfg)
 
     post_val = validate_document(
         result.optimized, validation=cfg.spec.validation, action_catalog=result.catalog
@@ -161,7 +195,7 @@ def _optimize_file(
                 file_path,
                 result,
                 split_result.documents,
-                output=output,
+                output_dir=split_output_dir if split_output_dir is not None else output,
                 dry_run=dry_run,
                 summary_only=summary_only,
                 cfg=cfg,
@@ -183,7 +217,8 @@ def _optimize_file(
                 file_path.name,
             )
     else:
-        _write_optimized(file_path, result.optimized, output)
+        write_path = _resolve_single_file_output(output, file_path)
+        _write_optimized(file_path, result.optimized, write_path)
         _print_summary(result, file_path)
 
 
@@ -192,7 +227,7 @@ def _handle_split_output(
     result: OptimizationResult,
     documents: list[ScpDocument],
     *,
-    output: Path | None,
+    output_dir: Path | None,
     dry_run: bool,
     summary_only: bool,
     cfg: OptimizerConfig,
@@ -200,6 +235,11 @@ def _handle_split_output(
     """Handle output when policy is split into multiple files."""
     console.print(f"[yellow]⚠ Splitting {file_path.name} into {len(documents)} SCPs[/yellow]")
     _print_summary(result, file_path)
+
+    write_output = not dry_run and not summary_only
+    split_out_dir: Path | None = None
+    if write_output:
+        split_out_dir = _resolve_split_output_dir(output_dir, file_path)
 
     for i, doc in enumerate(documents, 1):
         stem = file_path.stem
@@ -214,32 +254,35 @@ def _handle_split_output(
             console.print("[red]Split output failed validation; not writing.[/red]")
             raise typer.Exit(code=1)
 
-        if dry_run or summary_only:
+        if not write_output:
             console.print(
                 f"  → {out_name}: {doc.size_bytes:,} bytes, {len(doc.statement)} statements"
             )
             if dry_run and not summary_only:
                 _print_diff("", doc.to_json(), out_name)
-        else:
-            out_dir = output or file_path.parent
-            out_path = out_dir / out_name
-            out_path.write_text(doc.to_json() + "\n", encoding="utf-8")
-            console.print(f"  → wrote {out_path}")
+            continue
+
+        if split_out_dir is None:
+            console.print("[red]Error:[/red] Split output directory is missing.")
+            raise typer.Exit(code=1)
+        out_path = split_out_dir / out_name
+        out_path.write_text(doc.to_json() + "\n", encoding="utf-8")
+        console.print(f"  → wrote {out_path}")
 
 
-# ── schema command ───────────────────────────────────────────────────
+# ── print-schema ─────────────────────────────────────────────────────
 
 
-@app.command("schema")
-def schema_cmd(
+@app.command("print-schema")
+def print_schema(
     output: Path | None = typer.Option(
         None,
         "--output",
         "-o",
-        help="Write schema to a file instead of stdout.",
+        help="Write JSON Schema to this file instead of stdout.",
     ),
 ) -> None:
-    """Print the JSON Schema for scpz.yaml to stdout."""
+    """Emit the JSON Schema for scpz.yaml (OptimizerConfig)."""
     schema = OptimizerConfig.model_json_schema()
     # Annotate with $schema and $id so editors (e.g. VS Code YAML extension)
     # can resolve and apply the schema automatically.
@@ -258,14 +301,18 @@ def schema_cmd(
         sys.stdout.write(text)
 
 
-# ── validate command ─────────────────────────────────────────────────
+# ── validate ───────────────────────────────────────────────────────────
 
 
 @app.command("validate")
-def validate_cmd(
-    path: Path = typer.Argument(..., help="SCP JSON file or directory of JSON files."),
+def validate(
+    path: Path = typer.Argument(
+        ...,
+        help="SCP JSON file or directory containing *.json policies.",
+        metavar="PATH",
+    ),
 ) -> None:
-    """Validate SCP JSON file(s) without modifying them."""
+    """Check SCP JSON against structure, catalog, and configured validation rules."""
     files = _resolve_files(path)
     if not files:
         console.print("[red]No JSON files found.[/red]")
@@ -284,15 +331,23 @@ def validate_cmd(
     console.print("[green]✓ All files are valid.[/green]")
 
 
-# ── check-equivalence command ───────────────────────────────────────
+# ── check-equivalence ──────────────────────────────────────────────────
 
 
 @app.command("check-equivalence")
-def check_equivalence_cmd(
-    before: Path = typer.Argument(..., help="SCP JSON before optimization."),
-    after: Path = typer.Argument(..., help="SCP JSON after optimization."),
+def check_equivalence(
+    before: Path = typer.Argument(
+        ...,
+        help="Baseline SCP JSON (permissions must not shrink vs this file).",
+        metavar="BEFORE",
+    ),
+    after: Path = typer.Argument(
+        ...,
+        help="Candidate SCP JSON (must not broaden permissions vs BEFORE).",
+        metavar="AFTER",
+    ),
 ) -> None:
-    """Verify that *after* did not broaden permissions versus *before* (catalog model)."""
+    """Verify AFTER did not broaden permissions versus BEFORE (catalog model)."""
     if not before.is_file():
         console.print(f"[red]File not found:[/red] {before}")
         raise typer.Exit(code=1)
@@ -342,6 +397,64 @@ def _resolve_files(path: Path) -> list[Path]:
         return sorted(path.glob("*.json"))
     console.print(f"[red]Path not found:[/red] {path}")
     return []
+
+
+def _validate_output_path_kind(path: Path) -> None:
+    """Reject --output paths that exist as non-.json files (ambiguous vs directory)."""
+    if path.exists() and path.is_file() and path.suffix.lower() != ".json":
+        console.print(
+            "[red]Error:[/red] --output exists as a file but does not end in .json; "
+            "use a .json path for a single output file or a directory path otherwise."
+        )
+        raise typer.Exit(code=1)
+
+
+def _is_output_file_path(path: Path) -> bool:
+    """True when --output names a single file (only paths ending in .json)."""
+    if path.exists() and path.is_dir():
+        return False
+    return path.suffix.lower() == ".json"
+
+
+def _resolve_single_file_output(output: Path | None, file_path: Path) -> Path | None:
+    """Map --output to the file path for a single optimized SCP write."""
+    if output is None:
+        return None
+    if _is_output_file_path(output):
+        return output
+    return output / file_path.name
+
+
+def _validate_output_directory(output: Path, *, reason: str) -> None:
+    """Require --output to name a directory, not a single file path."""
+    if _is_output_file_path(output):
+        console.print(f"[red]Error:[/red] --output must be a directory when {reason}.")
+        raise typer.Exit(code=1)
+
+
+def _ensure_output_directory(output: Path) -> None:
+    """Create the output directory and any missing parents."""
+    output.mkdir(parents=True, exist_ok=True)
+
+
+def _require_output_directory(output: Path, *, reason: str, create: bool = True) -> None:
+    """Validate --output is a directory; optionally create it on disk."""
+    _validate_output_directory(output, reason=reason)
+    if create:
+        _ensure_output_directory(output)
+
+
+def _resolve_split_output_dir(output: Path | None, file_path: Path) -> Path:
+    """Resolve the directory for split SCP output files."""
+    if output is None:
+        return file_path.parent
+    if _is_output_file_path(output):
+        console.print(
+            "[red]Error:[/red] --output must be a directory when splitting into multiple SCPs."
+        )
+        raise typer.Exit(code=1)
+    _ensure_output_directory(output)
+    return output
 
 
 def _print_validation(result: ValidationResult, file_path: Path) -> None:

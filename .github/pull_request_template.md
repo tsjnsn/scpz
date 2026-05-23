@@ -16,4 +16,4 @@
 - [ ] Linting passes (`uv run ruff check src/ tests/`)
 - [ ] Type checking passes (`uv run mypy src/`)
 - [ ] `CHANGELOG.md` updated under `[Unreleased]`
-- [ ] Schema regenerated if `config.py` was modified (`uv run scpz schema -o schema/OptimizerConfig.json`)
+- [ ] Schema regenerated if `config.py` was modified (`uv run scpz print-schema -o schema/OptimizerConfig.json`)

@@ -3,10 +3,10 @@
 # Planned (not yet implemented) options are shown commented out.
 #
 # To validate your own scpz.yaml against the JSON Schema:
-#   scpz schema | python -m jsonschema - --instance your-scpz.yaml
+#   scpz print-schema | python -m jsonschema - --instance your-scpz.yaml
 #
 # To regenerate the committed schema after model changes:
-#   scpz schema -o schema/OptimizerConfig.json
+#   scpz print-schema -o schema/OptimizerConfig.json
 
 apiVersion: scpz.io/v1alpha1
 kind: OptimizerConfig

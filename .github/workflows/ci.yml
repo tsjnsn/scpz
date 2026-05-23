@@ -88,8 +88,8 @@ jobs:
 
       - name: Check schema is up to date
         run: |
-          uv run scpz schema | diff - schema/OptimizerConfig.json || \
-            (echo "schema/OptimizerConfig.json is out of date. Run: scpz schema -o schema/OptimizerConfig.json" && exit 1)
+          uv run scpz print-schema | diff - schema/OptimizerConfig.json || \
+            (echo "schema/OptimizerConfig.json is out of date. Run: scpz print-schema -o schema/OptimizerConfig.json" && exit 1)
 
   docs:
     name: Documentation site
@@ -151,4 +151,4 @@ jobs:
       - name: Smoke test CLI in container
         run: |
           docker run --rm scpz:ci --version
-          docker run --rm scpz:ci optimize-cmd --help > /dev/null
+          docker run --rm scpz:ci optimize --help > /dev/null
