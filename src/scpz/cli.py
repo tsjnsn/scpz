@@ -104,6 +104,8 @@ def optimize(
         raise typer.Exit(code=1)
 
     write_output = not dry_run and not summary_only
+    if output is not None:
+        _validate_output_path_kind(output)
     if len(files) > 1 and output is not None:
         _require_output_directory(
             output,
@@ -395,10 +397,20 @@ def _resolve_files(path: Path) -> list[Path]:
     return []
 
 
+def _validate_output_path_kind(path: Path) -> None:
+    """Reject --output paths that exist as non-.json files (ambiguous vs directory)."""
+    if path.exists() and path.is_file() and path.suffix.lower() != ".json":
+        console.print(
+            "[red]Error:[/red] --output exists as a file but does not end in .json; "
+            "use a .json path for a single output file or a directory path otherwise."
+        )
+        raise typer.Exit(code=1)
+
+
 def _is_output_file_path(path: Path) -> bool:
-    """True when --output names a single file (existing file or .json suffix)."""
-    if path.exists():
-        return path.is_file()
+    """True when --output names a single file (only paths ending in .json)."""
+    if path.exists() and path.is_dir():
+        return False
     return path.suffix.lower() == ".json"
 
 

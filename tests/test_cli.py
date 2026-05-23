@@ -321,6 +321,20 @@ class TestOptimizeOutput:
         assert (out_dir / "a.json").exists()
         assert (out_dir / "b.json").exists()
 
+    def test_existing_non_json_output_file_rejected(
+        self, fixtures_dir: Path, tmp_path: Path
+    ) -> None:
+        src = fixtures_dir / "simple_deny.json"
+        existing = tmp_path / "optimized"
+        existing.write_text("{}", encoding="utf-8")
+        result = runner.invoke(
+            app,
+            ["optimize", str(src), "--output", str(existing)],
+        )
+        assert result.exit_code == 1
+        combined = result.stdout + result.stderr
+        assert ".json" in combined.lower()
+
     def test_output_without_json_suffix_is_directory_destination(
         self, fixtures_dir: Path, tmp_path: Path
     ) -> None:
