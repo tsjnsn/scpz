@@ -75,9 +75,10 @@ def optimize(
         "--output",
         "-o",
         help=(
-            "Destination for optimized JSON. For one policy without splitting, a file path "
-            "(in-place when omitted). For split output or when PATH is a directory of policies, "
-            "must be a directory; split files are written as <stem>_N.json inside it."
+            "Destination for optimized JSON (in-place when omitted). Paths ending in .json "
+            "name a single output file; all other paths are directories (writes "
+            "<output>/<input filename> for one policy, or <stem>_N.json when splitting). "
+            "Batch runs (PATH is a directory of policies) require a directory."
         ),
     ),
     dry_run: bool = typer.Option(
@@ -212,9 +213,8 @@ def _optimize_file(
                 file_path.name,
             )
     else:
-        if output is not None:
-            _reject_output_directory_for_single_file(output)
-        _write_optimized(file_path, result.optimized, output)
+        write_path = _resolve_single_file_output(output, file_path)
+        _write_optimized(file_path, result.optimized, write_path)
         _print_summary(result, file_path)
 
 
@@ -395,22 +395,25 @@ def _resolve_files(path: Path) -> list[Path]:
     return []
 
 
-def _is_existing_directory(path: Path) -> bool:
-    return path.exists() and path.is_dir()
+def _is_output_file_path(path: Path) -> bool:
+    """True when --output names a single file (existing file or .json suffix)."""
+    if path.exists():
+        return path.is_file()
+    return path.suffix.lower() == ".json"
 
 
-def _is_existing_file(path: Path) -> bool:
-    return path.exists() and path.is_file()
-
-
-def _looks_like_new_file_path(path: Path) -> bool:
-    """True when a non-existent path clearly names a single output file."""
-    return not path.exists() and path.suffix.lower() == ".json"
+def _resolve_single_file_output(output: Path | None, file_path: Path) -> Path | None:
+    """Map --output to the file path for a single optimized SCP write."""
+    if output is None:
+        return None
+    if _is_output_file_path(output):
+        return output
+    return output / file_path.name
 
 
 def _validate_output_directory(output: Path, *, reason: str) -> None:
     """Require --output to name a directory, not a single file path."""
-    if _is_existing_file(output) or _looks_like_new_file_path(output):
+    if _is_output_file_path(output):
         console.print(f"[red]Error:[/red] --output must be a directory when {reason}.")
         raise typer.Exit(code=1)
 
@@ -427,20 +430,11 @@ def _require_output_directory(output: Path, *, reason: str, create: bool = True)
         _ensure_output_directory(output)
 
 
-def _reject_output_directory_for_single_file(output: Path) -> None:
-    """Reject --output when it names a directory but only one SCP will be written."""
-    if _is_existing_directory(output):
-        console.print(
-            "[red]Error:[/red] --output must be a file path when writing a single optimized SCP."
-        )
-        raise typer.Exit(code=1)
-
-
 def _resolve_split_output_dir(output: Path | None, file_path: Path) -> Path:
     """Resolve the directory for split SCP output files."""
     if output is None:
         return file_path.parent
-    if _is_existing_file(output) or _looks_like_new_file_path(output):
+    if _is_output_file_path(output):
         console.print(
             "[red]Error:[/red] --output must be a directory when splitting into multiple SCPs."
         )

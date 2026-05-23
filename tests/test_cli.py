@@ -321,17 +321,26 @@ class TestOptimizeOutput:
         assert (out_dir / "a.json").exists()
         assert (out_dir / "b.json").exists()
 
-    def test_output_without_extension_is_file_destination(
+    def test_output_without_json_suffix_is_directory_destination(
         self, fixtures_dir: Path, tmp_path: Path
     ) -> None:
         src = fixtures_dir / "simple_deny.json"
-        out = tmp_path / "optimized"
+        out_dir = tmp_path / "optimized"
         result = runner.invoke(
             app,
-            ["optimize", str(src), "--output", str(out)],
+            ["optimize", str(src), "--output", str(out_dir)],
         )
         assert result.exit_code == 0
-        assert out.is_file()
+        assert out_dir.is_dir()
+        assert (out_dir / src.name).is_file()
+
+    def test_extensionless_output_same_semantics_for_split(self, tmp_path: Path) -> None:
+        policy = _needs_split_policy(tmp_path)
+        out_dir = tmp_path / "optimized"
+        result = runner.invoke(app, ["optimize", str(policy), "--output", str(out_dir)])
+        assert result.exit_code == 0
+        assert out_dir.is_dir()
+        assert len(list(out_dir.glob("needs_split_*.json"))) > 1
 
     def test_batch_split_policy_writes_under_output_directory(self, tmp_path: Path) -> None:
         policy = _needs_split_policy(tmp_path)
