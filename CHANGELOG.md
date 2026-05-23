@@ -9,15 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.0] - 2026-05-22
 
-### Changed
-
-- **CLI redesign (breaking):** flat verb-first commands with hyphenated multi-word names.
-  - `optimize-cmd` → `optimize`
-  - `schema` → `print-schema`
-  - `validate` and `check-equivalence` unchanged
-  - No backward-compatibility aliases for removed command names
-  - Normalized `--help` / `--version` messaging and option help text
-
 ### Added
 
 - Public documentation site built with MkDocs Material, deployed to GitHub Pages via `.github/workflows/pages.yml` (enable **Settings → Pages → GitHub Actions** on first use).
@@ -55,6 +46,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   used for ``NotAction`` because wildcards would exempt additional APIs).
 
 ### Changed
+
+- **CLI redesign (breaking):** flat verb-first commands with hyphenated multi-word names.
+  - `optimize-cmd` → `optimize`
+  - `schema` → `print-schema`
+  - `validate` and `check-equivalence` unchanged
+  - No backward-compatibility aliases for removed command names
+  - Normalized `--help` / `--version` messaging and option help text
 - `optimize` applies the same validation rules as `validate`, checks the
   optimized document (and each split shard) before any write, exits non-zero
   when any issue is elevated to `error`, and skips backups, in-place writes,
