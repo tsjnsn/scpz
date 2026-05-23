@@ -118,6 +118,11 @@ spec:
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
+def _strip_wrapped_line_padding(text: str) -> str:
+    """Remove Rich/Typer end-of-line padding from captured terminal output."""
+    return "\n".join(line.rstrip() for line in text.splitlines())
+
+
 def _run(cmd: list[str], cwd: Path) -> str:
     env = {**os.environ, "NO_COLOR": "1", "PYTHONUNBUFFERED": "1"}
     result = subprocess.run(
@@ -128,7 +133,7 @@ def _run(cmd: list[str], cwd: Path) -> str:
         cwd=cwd,
         env=env,
     )
-    return _ANSI_RE.sub("", result.stdout).rstrip()
+    return _strip_wrapped_line_padding(_ANSI_RE.sub("", result.stdout)).rstrip()
 
 
 def _scpz(args: str, cwd: Path) -> str:
@@ -144,9 +149,7 @@ def main() -> None:
         # Files for the max-settings demo (policy.json + scpz.yaml)
         max_dir = tmp / "max"
         max_dir.mkdir()
-        (max_dir / "policy.json").write_text(
-            json.dumps(POLICY_JSON, indent=2), encoding="utf-8"
-        )
+        (max_dir / "policy.json").write_text(json.dumps(POLICY_JSON, indent=2), encoding="utf-8")
         (max_dir / "scpz.yaml").write_text(MAX_SCPZ_YAML, encoding="utf-8")
 
         # No-config directory (policy.json only, no scpz.yaml)
@@ -182,22 +185,22 @@ def main() -> None:
             "$ scpz validate bloated_deny.json",
             _scpz("validate bloated_deny.json", tmp),
             "",
-            "$ scpz optimize-cmd bloated_deny.json --summary-only",
-            _scpz("optimize-cmd bloated_deny.json --summary-only", tmp),
+            "$ scpz optimize bloated_deny.json --summary-only",
+            _scpz("optimize bloated_deny.json --summary-only", tmp),
             "",
         ]
 
         fresh_bloated()
         sections += [
-            "$ scpz optimize-cmd bloated_deny.json --dry-run",
-            _scpz("optimize-cmd bloated_deny.json --dry-run", tmp),
+            "$ scpz optimize bloated_deny.json --dry-run",
+            _scpz("optimize bloated_deny.json --dry-run", tmp),
             "",
         ]
 
         fresh_bloated()
         sections += [
-            "$ scpz optimize-cmd bloated_deny.json",
-            _scpz("optimize-cmd bloated_deny.json", tmp),
+            "$ scpz optimize bloated_deny.json",
+            _scpz("optimize bloated_deny.json", tmp),
             "",
         ]
 
@@ -221,14 +224,14 @@ def main() -> None:
             "# Input: 6 statements written by a human, split by intent.",
             '# One is a duplicate ("AlsoNoDeleteRole" repeats actions already in "DenyIAMRoleMgmt").',
             "",
-            "$ scpz optimize-cmd policy.json --summary-only   # default settings, no scpz.yaml",
-            _scpz("optimize-cmd policy.json --summary-only", noconf_dir),
+            "$ scpz optimize policy.json --summary-only   # default settings, no scpz.yaml",
+            _scpz("optimize policy.json --summary-only", noconf_dir),
             "",
-            "$ scpz optimize-cmd policy.json --summary-only   # with scpz.yaml (max settings)",
-            _scpz("optimize-cmd policy.json --summary-only", max_dir),
+            "$ scpz optimize policy.json --summary-only   # with scpz.yaml (max settings)",
+            _scpz("optimize policy.json --summary-only", max_dir),
             "",
-            "$ scpz optimize-cmd policy.json --dry-run        # full diff, max settings",
-            _scpz("optimize-cmd policy.json --dry-run", max_dir),
+            "$ scpz optimize policy.json --dry-run        # full diff, max settings",
+            _scpz("optimize policy.json --dry-run", max_dir),
         ]
 
         demo = REPO_ROOT / "demo.txt"

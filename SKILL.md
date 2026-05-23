@@ -42,22 +42,22 @@ then auto-splits if the policy still exceeds limits.
 
 ```bash
 # Optimize in-place (creates .bak backup)
-scpz optimize-cmd policy.json
+scpz optimize policy.json
 
 # Optimize a whole directory
-scpz optimize-cmd policies/
+scpz optimize policies/
 
 # Preview changes without writing
-scpz optimize-cmd policy.json --dry-run
+scpz optimize policy.json --dry-run
 
 # Just show the byte/statement summary
-scpz optimize-cmd policy.json --summary-only
+scpz optimize policy.json --summary-only
 
 # Write to a different file
-scpz optimize-cmd policy.json --output optimized.json
+scpz optimize policy.json --output optimized.json
 
 # Error instead of auto-splitting
-scpz optimize-cmd policy.json --no-split
+scpz optimize policy.json --no-split
 ```
 
 ### Validate
@@ -74,8 +74,8 @@ scpz validate policies/
 Emit the JSON Schema for scpz.yaml config files:
 
 ```bash
-scpz schema
-scpz schema -o schema/OptimizerConfig.json
+scpz print-schema
+scpz print-schema -o schema/OptimizerConfig.json
 ```
 
 ## Optimization Passes
@@ -139,9 +139,9 @@ pass block under `spec.optimizer`, not at the `spec` level.
 1. **Validate** the raw SCP to catch structural issues early:
    `scpz validate policy.json`
 2. **Dry-run** optimization to preview what changes:
-   `scpz optimize-cmd policy.json --dry-run`
+   `scpz optimize policy.json --dry-run`
 3. **Optimize** once satisfied:
-   `scpz optimize-cmd policy.json`
+   `scpz optimize policy.json`
 4. If the policy was split, review each `policy_N.json` output file.
 5. Deploy the optimized SCP(s) via your IaC pipeline (Terraform, CloudFormation, etc.).
 
@@ -155,4 +155,4 @@ uv run pytest -q
 ```
 
 Always run all four checks after any code change. If `src/scpz/config.py` changes,
-also regenerate the schema: `uv run scpz schema -o schema/OptimizerConfig.json`.
+also regenerate the schema: `uv run scpz print-schema -o schema/OptimizerConfig.json`.

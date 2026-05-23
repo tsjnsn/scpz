@@ -7,15 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-22
+
 ### Added
 
 - Public documentation site built with MkDocs Material, deployed to GitHub Pages via `.github/workflows/pages.yml` (enable **Settings → Pages → GitHub Actions** on first use).
 - Official **Docker Hub** image `tsjnsn/scpz`: release workflow pushes tags on
   each GitHub release (`<release tag>` plus `latest` for stable releases).
-
-## [0.3.0] - 2026-05-22
-
-### Added
 - CI job **Equivalence golden regression** runs `tests/test_golden_regression.py`:
   every `examples/*.json` and the NotAction fixtures in that module are
   optimized then checked with `check_permission_equivalence` so merges block on
@@ -48,6 +46,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   used for ``NotAction`` because wildcards would exempt additional APIs).
 
 ### Changed
+
+- **CLI redesign (breaking):** flat verb-first commands with hyphenated multi-word names.
+  - `optimize-cmd` → `optimize`
+  - `schema` → `print-schema`
+  - `validate` and `check-equivalence` unchanged
+  - No backward-compatibility aliases for removed command names
+  - Normalized `--help` / `--version` messaging and option help text
+  - `--output` is deterministic: only paths ending in `.json` name a single file
+    (existing directories always use directory semantics); otherwise `--output`
+    is a directory (`<output>/<input>` or split shards); when PATH is a
+    directory, `--output` must be a directory
 - `optimize` applies the same validation rules as `validate`, checks the
   optimized document (and each split shard) before any write, exits non-zero
   when any issue is elevated to `error`, and skips backups, in-place writes,

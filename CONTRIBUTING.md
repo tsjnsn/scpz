@@ -61,7 +61,7 @@ When CI fails on this suite:
 If you modify `src/scpz/config.py` (Pydantic models), also regenerate the committed schema:
 
 ```bash
-uv run scpz schema -o schema/OptimizerConfig.json
+uv run scpz print-schema -o schema/OptimizerConfig.json
 ```
 
 ## Adding a new optimization pass
