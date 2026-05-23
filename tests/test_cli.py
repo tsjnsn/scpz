@@ -307,6 +307,30 @@ class TestOptimizeOutput:
         assert result.exit_code == 1
         assert "directory" in result.stderr.lower()
 
+    def test_single_file_directory_output_must_be_directory(
+        self, fixtures_dir: Path, tmp_path: Path
+    ) -> None:
+        shutil.copy2(fixtures_dir / "simple_deny.json", tmp_path / "only.json")
+        out_file = tmp_path / "out.json"
+        result = runner.invoke(
+            app,
+            ["optimize", str(tmp_path), "--output", str(out_file)],
+        )
+        assert result.exit_code == 1
+        assert "directory" in result.stderr.lower()
+
+    def test_single_file_directory_output_directory_writes_per_file(
+        self, fixtures_dir: Path, tmp_path: Path
+    ) -> None:
+        shutil.copy2(fixtures_dir / "simple_deny.json", tmp_path / "only.json")
+        out_dir = tmp_path / "optimized"
+        result = runner.invoke(
+            app,
+            ["optimize", str(tmp_path), "--output", str(out_dir)],
+        )
+        assert result.exit_code == 0
+        assert (out_dir / "only.json").exists()
+
     def test_batch_output_directory_writes_per_file(
         self, fixtures_dir: Path, tmp_path: Path
     ) -> None:

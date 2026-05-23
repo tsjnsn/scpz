@@ -75,10 +75,11 @@ def optimize(
         "--output",
         "-o",
         help=(
-            "Destination for optimized JSON (in-place when omitted). Paths ending in .json "
-            "name a single output file; all other paths are directories (writes "
-            "<output>/<input filename> for one policy, or <stem>_N.json when splitting). "
-            "Batch runs (PATH is a directory of policies) require a directory."
+            "Destination for optimized JSON (in-place when omitted). For a single input "
+            "file: paths ending in .json name one output file (an existing directory "
+            "always uses directory semantics); otherwise --output is a directory and "
+            "writes <output>/<input filename> (or <stem>_N.json when splitting). When "
+            "PATH is a directory of policies, --output must be a directory."
         ),
     ),
     dry_run: bool = typer.Option(
@@ -106,10 +107,11 @@ def optimize(
     write_output = not dry_run and not summary_only
     if output is not None:
         _validate_output_path_kind(output)
-    if len(files) > 1 and output is not None:
+    is_batch = path.is_dir()
+    if is_batch and output is not None:
         _require_output_directory(
             output,
-            reason=f"PATH contains {len(files)} policies",
+            reason="PATH is a directory",
             create=write_output,
         )
 
@@ -117,7 +119,7 @@ def optimize(
     for file_path in files:
         file_output = output
         split_output_dir = output
-        if len(files) > 1 and output is not None:
+        if is_batch and output is not None:
             file_output = output / file_path.name
         try:
             _optimize_file(

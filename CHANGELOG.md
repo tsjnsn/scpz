@@ -53,8 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `validate` and `check-equivalence` unchanged
   - No backward-compatibility aliases for removed command names
   - Normalized `--help` / `--version` messaging and option help text
-  - `--output` is deterministic: only paths ending in `.json` name a single file;
-    otherwise `--output` is a directory (`<output>/<input>` or split shards)
+  - `--output` is deterministic: only paths ending in `.json` name a single file
+    (existing directories always use directory semantics); otherwise `--output`
+    is a directory (`<output>/<input>` or split shards); when PATH is a
+    directory, `--output` must be a directory
 - `optimize` applies the same validation rules as `validate`, checks the
   optimized document (and each split shard) before any write, exits non-zero
   when any issue is elevated to `error`, and skips backups, in-place writes,
