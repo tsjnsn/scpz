@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-22
+
+### Added
+
+- GitHub Pages documentation site (MkDocs Material) at https://tsjnsn.github.io/scpz/.
+- Container images published on each GitHub release to GHCR (`ghcr.io/tsjnsn/scpz`) and Docker Hub (`tsjnsn/scpz`), plus a root `Dockerfile` for local builds.
+
+### Changed
+
+- CLI commands renamed to match the v0.3.0 design: `optimize-cmd` → `optimize`, `schema` → `print-schema`.
+- Richer `--help` / `--version` messaging, command epilog, and option help text across all commands.
+
+### Fixed
+
+- `check-equivalence` action pattern matching uses case-insensitive `fnmatch` with `*` and `?` wildcards anywhere in the pattern (IAM semantics).
+- `ActionCatalog.iter_full_actions()` and `all_full_actions()` normalize service prefixes to lowercase for consistent catalog-backed checks.
+
 ## [0.3.0] - 2026-05-22
 
 ### Added
@@ -129,7 +146,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dry-run and summary-only modes
 - Rich terminal output with diffs and optimization summaries
 
-[Unreleased]: https://github.com/tsjnsn/scpz/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/tsjnsn/scpz/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/tsjnsn/scpz/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/tsjnsn/scpz/compare/v0.2.7...v0.3.0
 [0.2.7]: https://github.com/tsjnsn/scpz/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/tsjnsn/scpz/compare/v0.2.5...v0.2.6
