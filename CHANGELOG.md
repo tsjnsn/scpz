@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `--json` on `validate` and `check-equivalence` for stable machine-readable stdout output (CI and automation); exit codes unchanged from human mode.
+
 ## [0.3.1] - 2026-05-22
 
 ### Added
