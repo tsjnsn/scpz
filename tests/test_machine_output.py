@@ -238,6 +238,29 @@ class TestCheckEquivalenceJsonOutput:
         combined = (result.stdout + result.stderr).replace("\n", " ")
         assert combined.count("not in the AWS action catalog") == 1
 
+    def test_human_mode_prints_warnings_on_success(self, tmp_path: Path) -> None:
+        """Warnings-only validation must still appear in human output when equivalent."""
+        policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Deny",
+                    "Action": "s3:GetObject",
+                    "Resource": "*",
+                },
+            ],
+        }
+        text = json.dumps(policy)
+        before = tmp_path / "before.json"
+        after = tmp_path / "after.json"
+        before.write_text(text, encoding="utf-8")
+        after.write_text(text, encoding="utf-8")
+        result = runner.invoke(app, ["check-equivalence", str(before), str(after)])
+        assert result.exit_code == 0
+        combined = result.stdout + result.stderr
+        assert "very broad" in combined
+        assert combined.count("very broad") == 2
+
     def test_loads_catalog_once(self, fixtures_dir: Path, tmp_path: Path) -> None:
         src = fixtures_dir / "simple_deny.json"
         a = tmp_path / "a.json"

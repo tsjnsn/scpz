@@ -526,6 +526,8 @@ def check_equivalence(
         raise typer.Exit(code=1) from exc
 
     val_b = validate_document(doc_before, validation=cfg.spec.validation, action_catalog=catalog)
+    if not json_mode:
+        _print_validation(val_b, before)
     if not val_b.is_valid:
         if json_mode:
             emit_and_exit(
@@ -542,10 +544,11 @@ def check_equivalence(
                 ),
                 code=1,
             )
-        _print_validation(val_b, before)
         raise typer.Exit(code=1)
 
     val_a = validate_document(doc_after, validation=cfg.spec.validation, action_catalog=catalog)
+    if not json_mode:
+        _print_validation(val_a, after)
     if not val_a.is_valid:
         if json_mode:
             emit_and_exit(
@@ -562,7 +565,6 @@ def check_equivalence(
                 ),
                 code=1,
             )
-        _print_validation(val_a, after)
         raise typer.Exit(code=1)
 
     eq = check_permission_equivalence(doc_before, doc_after, catalog)
