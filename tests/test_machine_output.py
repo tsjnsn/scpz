@@ -61,6 +61,22 @@ class TestValidateJsonOutput:
         assert payload["files"] == []
         assert "Path not found" in payload["error"]
 
+    def test_missing_path_human_single_message(self) -> None:
+        result = runner.invoke(app, ["validate", "/nonexistent/path.json"])
+        assert result.exit_code == 1
+        combined = result.stdout + result.stderr
+        assert combined.count("Path not found") == 1
+        assert "No JSON files found" not in combined
+
+    def test_empty_dir_human_message(self, tmp_path: Path) -> None:
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        result = runner.invoke(app, ["validate", str(empty)])
+        assert result.exit_code == 1
+        combined = result.stdout + result.stderr
+        assert "No JSON files found" in combined
+        assert "Path not found" not in combined
+
     def test_json_stdout_only(self, fixtures_dir: Path) -> None:
         result = runner.invoke(
             app,

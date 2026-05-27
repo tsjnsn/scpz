@@ -335,7 +335,7 @@ def validate(
 ) -> None:
     """Check SCP JSON against structure, catalog, and configured validation rules."""
     json_mode = output_format is OutputFormat.JSON
-    files = _resolve_files(path, quiet=json_mode)
+    files = _resolve_files(path, quiet=True)
     if not files:
         if json_mode:
             payload = build_validate_payload(
@@ -346,7 +346,7 @@ def validate(
             )
             emit_json(payload)
         else:
-            console.print("[red]No JSON files found.[/red]")
+            _print_no_files_error(path)
         raise typer.Exit(code=1)
 
     entries: list[dict[str, object]] = []
@@ -544,6 +544,14 @@ def _no_files_error(path: Path) -> str:
     if path.is_file() or path.is_dir():
         return "No JSON files found"
     return f"Path not found: {path}"
+
+
+def _print_no_files_error(path: Path) -> None:
+    """Print a single human-readable error when no JSON files are available."""
+    if path.is_file() or path.is_dir():
+        console.print("[red]No JSON files found.[/red]")
+    else:
+        console.print(f"[red]Path not found:[/red] {path}")
 
 
 def _resolve_files(path: Path, *, quiet: bool = False) -> list[Path]:

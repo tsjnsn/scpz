@@ -6,9 +6,10 @@ import json
 import sys
 from enum import StrEnum
 from pathlib import Path  # noqa: TC003 — used at runtime in payload builders
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
-from scpz.validator import ValidationIssue, ValidationResult  # noqa: TC001
+if TYPE_CHECKING:
+    from scpz.validator import ValidationIssue, ValidationResult
 
 SCHEMA_VERSION = 1
 
