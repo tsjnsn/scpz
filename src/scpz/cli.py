@@ -17,15 +17,15 @@ from scpz import __version__
 from scpz.catalog import ActionCatalog
 from scpz.config import SUPPORTED_API_VERSION, SUPPORTED_KIND, OptimizerConfig
 from scpz.equivalence import check_permission_equivalence
-from scpz.optimizer import OptimizationResult
-from scpz.optimizer import optimize as run_optimize
-from scpz.splitter import SplitError, split_if_needed
 from scpz.machine_output import (
     build_check_equivalence_payload,
     build_validate_payload,
     emit_json,
     file_validation_to_dict,
 )
+from scpz.optimizer import OptimizationResult
+from scpz.optimizer import optimize as run_optimize
+from scpz.splitter import SplitError, split_if_needed
 from scpz.validator import Severity, ValidationResult, validate_document, validate_file
 
 if TYPE_CHECKING:

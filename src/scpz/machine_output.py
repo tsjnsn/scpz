@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from scpz import __version__
-from scpz.validator import ValidationIssue, ValidationResult
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from scpz.validator import ValidationIssue, ValidationResult
 
 CommandName = Literal["validate", "check-equivalence"]
 Status = Literal["ok", "error"]

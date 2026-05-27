@@ -4,23 +4,17 @@ from __future__ import annotations
 
 import json
 import shutil
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import Any
 
 from typer.testing import CliRunner
 
 from scpz.cli import app
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
 runner = CliRunner()
 
-VALIDATE_TOP_KEYS = frozenset(
-    {"command", "version", "status", "exit_code", "files", "summary"}
-)
-VALIDATE_FILE_KEYS = frozenset(
-    {"path", "valid", "error_count", "warning_count", "issues"}
-)
+VALIDATE_TOP_KEYS = frozenset({"command", "version", "status", "exit_code", "files", "summary"})
+VALIDATE_FILE_KEYS = frozenset({"path", "valid", "error_count", "warning_count", "issues"})
 VALIDATE_ISSUE_KEYS = frozenset({"severity", "message", "path"})
 VALIDATE_SUMMARY_KEYS = frozenset({"file_count", "valid_count", "invalid_count"})
 
