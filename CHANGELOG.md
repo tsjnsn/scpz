@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Machine-readable JSON output for `validate` and `check-equivalence` via shared `--format json` / `-f json` flag; documented exit codes for automation.
+
 ## [0.3.1] - 2026-05-22
 
 ### Added

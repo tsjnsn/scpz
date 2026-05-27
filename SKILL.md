@@ -67,6 +67,10 @@ Check SCP JSON for structural and limit issues without modifying anything.
 ```bash
 scpz validate policy.json
 scpz validate policies/
+
+# CI / automation: JSON on stdout, exit code 0/1
+scpz validate policy.json --format json
+scpz check-equivalence before.json after.json --format json
 ```
 
 ### Schema

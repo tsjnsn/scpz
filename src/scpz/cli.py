@@ -7,7 +7,7 @@ import json
 import shutil
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 from rich.console import Console
@@ -17,6 +17,13 @@ from scpz import __version__
 from scpz.catalog import ActionCatalog
 from scpz.config import SUPPORTED_API_VERSION, SUPPORTED_KIND, OptimizerConfig
 from scpz.equivalence import check_permission_equivalence
+from scpz.machine_output import (
+    OutputFormat,
+    build_check_equivalence_payload,
+    build_validate_payload,
+    emit_json,
+    file_validation_entry,
+)
 from scpz.optimizer import OptimizationResult
 from scpz.optimizer import optimize as run_optimize
 from scpz.splitter import SplitError, split_if_needed
@@ -38,6 +45,19 @@ app = typer.Typer(
 )
 console = Console(stderr=True)
 out = Console()
+
+FormatOption = Annotated[
+    OutputFormat,
+    typer.Option(
+        "--format",
+        "-f",
+        help=(
+            "Output format: human (Rich text, default) or json "
+            "(machine-readable JSON on stdout for CI and automation)."
+        ),
+        case_sensitive=False,
+    ),
+]
 
 
 def version_callback(value: bool) -> None:
@@ -311,24 +331,48 @@ def validate(
         help="SCP JSON file or directory containing *.json policies.",
         metavar="PATH",
     ),
+    output_format: FormatOption = OutputFormat.HUMAN,
 ) -> None:
     """Check SCP JSON against structure, catalog, and configured validation rules."""
-    files = _resolve_files(path)
+    json_mode = output_format is OutputFormat.JSON
+    files = _resolve_files(path, quiet=json_mode)
     if not files:
-        console.print("[red]No JSON files found.[/red]")
+        if json_mode:
+            payload = build_validate_payload(
+                files=[],
+                status="error",
+                exit_code=1,
+                error=_no_files_error(path),
+            )
+            emit_json(payload)
+        else:
+            console.print("[red]No JSON files found.[/red]")
         raise typer.Exit(code=1)
 
+    entries: list[dict[str, object]] = []
     has_errors = False
     for file_path in files:
         _, val_result = validate_file(file_path)
-        _print_validation(val_result, file_path)
+        entries.append(file_validation_entry(file_path, val_result))
+        if not json_mode:
+            _print_validation(val_result, file_path)
         if not val_result.is_valid:
             has_errors = True
 
+    exit_code = 1 if has_errors else 0
+    if json_mode:
+        emit_json(
+            build_validate_payload(
+                files=entries,
+                status="error" if has_errors else "ok",
+                exit_code=exit_code,
+            )
+        )
+    elif not has_errors:
+        console.print("[green]✓ All files are valid.[/green]")
+
     if has_errors:
         raise typer.Exit(code=1)
-
-    console.print("[green]✓ All files are valid.[/green]")
 
 
 # ── check-equivalence ──────────────────────────────────────────────────
@@ -346,39 +390,146 @@ def check_equivalence(
         help="Candidate SCP JSON (must not broaden permissions vs BEFORE).",
         metavar="AFTER",
     ),
+    output_format: FormatOption = OutputFormat.HUMAN,
 ) -> None:
     """Verify AFTER did not broaden permissions versus BEFORE (catalog model)."""
+    json_mode = output_format is OutputFormat.JSON
+
+    def emit_and_exit(payload: dict[str, object], *, code: int) -> None:
+        if json_mode:
+            emit_json(payload)
+        raise typer.Exit(code=code)
+
     if not before.is_file():
+        if json_mode:
+            emit_and_exit(
+                build_check_equivalence_payload(
+                    before=before,
+                    after=after,
+                    status="error",
+                    exit_code=1,
+                    equivalent=None,
+                    messages=[],
+                    error=f"File not found: {before}",
+                ),
+                code=1,
+            )
         console.print(f"[red]File not found:[/red] {before}")
         raise typer.Exit(code=1)
     if not after.is_file():
+        if json_mode:
+            emit_and_exit(
+                build_check_equivalence_payload(
+                    before=before,
+                    after=after,
+                    status="error",
+                    exit_code=1,
+                    equivalent=None,
+                    messages=[],
+                    error=f"File not found: {after}",
+                ),
+                code=1,
+            )
         console.print(f"[red]File not found:[/red] {after}")
         raise typer.Exit(code=1)
 
     try:
         cfg = OptimizerConfig.load(before)
     except ValueError as exc:
+        if json_mode:
+            emit_and_exit(
+                build_check_equivalence_payload(
+                    before=before,
+                    after=after,
+                    status="error",
+                    exit_code=1,
+                    equivalent=None,
+                    messages=[],
+                    error=f"Config error: {exc}",
+                ),
+                code=1,
+            )
         console.print(f"[red]Config error:[/red] {exc}")
         raise typer.Exit(code=1) from exc
 
     doc_before, val_b = validate_file(before, config=cfg)
-    _print_validation(val_b, before)
+    if not json_mode:
+        _print_validation(val_b, before)
     if doc_before is None or not val_b.is_valid:
+        if json_mode:
+            emit_and_exit(
+                build_check_equivalence_payload(
+                    before=before,
+                    after=after,
+                    status="error",
+                    exit_code=1,
+                    equivalent=None,
+                    messages=[],
+                    before_validation=val_b,
+                    error="Validation failed for BEFORE file",
+                ),
+                code=1,
+            )
         raise typer.Exit(code=1)
 
     doc_after, val_a = validate_file(after, config=cfg)
-    _print_validation(val_a, after)
+    if not json_mode:
+        _print_validation(val_a, after)
     if doc_after is None or not val_a.is_valid:
+        if json_mode:
+            emit_and_exit(
+                build_check_equivalence_payload(
+                    before=before,
+                    after=after,
+                    status="error",
+                    exit_code=1,
+                    equivalent=None,
+                    messages=[],
+                    before_validation=val_b,
+                    after_validation=val_a,
+                    error="Validation failed for AFTER file",
+                ),
+                code=1,
+            )
         raise typer.Exit(code=1)
 
     catalog = ActionCatalog.load(cfg.spec.catalog)
     eq = check_permission_equivalence(doc_before, doc_after, catalog)
     if eq.ok:
+        if json_mode:
+            emit_and_exit(
+                build_check_equivalence_payload(
+                    before=before,
+                    after=after,
+                    status="ok",
+                    exit_code=0,
+                    equivalent=True,
+                    messages=[],
+                    before_validation=val_b,
+                    after_validation=val_a,
+                ),
+                code=0,
+            )
         console.print(
             "[green]✓ Equivalence OK:[/green] after is same or stricter than before "
             "(Deny / Allow catalog model)."
         )
         raise typer.Exit(code=0)
+
+    if json_mode:
+        emit_and_exit(
+            build_check_equivalence_payload(
+                before=before,
+                after=after,
+                status="error",
+                exit_code=1,
+                equivalent=False,
+                messages=list(eq.messages),
+                before_validation=val_b,
+                after_validation=val_a,
+            ),
+            code=1,
+        )
 
     console.print("[red]Equivalence check failed.[/red]")
     for msg in eq.messages:
@@ -389,13 +540,20 @@ def check_equivalence(
 # ── helpers ──────────────────────────────────────────────────────────
 
 
-def _resolve_files(path: Path) -> list[Path]:
+def _no_files_error(path: Path) -> str:
+    if path.is_file() or path.is_dir():
+        return "No JSON files found"
+    return f"Path not found: {path}"
+
+
+def _resolve_files(path: Path, *, quiet: bool = False) -> list[Path]:
     """Resolve a path argument to a list of JSON files."""
     if path.is_file():
         return [path]
     if path.is_dir():
         return sorted(path.glob("*.json"))
-    console.print(f"[red]Path not found:[/red] {path}")
+    if not quiet:
+        console.print(f"[red]Path not found:[/red] {path}")
     return []
 
 
