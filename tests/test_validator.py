@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import textwrap
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 from scpz.catalog import ActionCatalog
 from scpz.config import SUPPORTED_API_VERSION, SUPPORTED_KIND, ValidationConfig
@@ -341,10 +342,40 @@ class TestValidateFileConfig:
         assert not result.is_valid
         assert any("not in the AWS action catalog" in i.message for i in result.errors)
 
+    def test_parse_scp_file_valid(self, fixtures_dir: Path) -> None:
+        from scpz.validator import parse_scp_file
+
+        doc, result = parse_scp_file(fixtures_dir / "simple_deny.json")
+        assert doc is not None
+        assert result.is_valid
+        assert result.issues == []
+
+    def test_parse_scp_file_invalid_json(self, tmp_path: Path) -> None:
+        from scpz.validator import parse_scp_file
+
+        bad = tmp_path / "bad.json"
+        bad.write_text("{not json", encoding="utf-8")
+        doc, result = parse_scp_file(bad)
+        assert doc is None
+        assert not result.is_valid
+        assert any("Invalid JSON" in i.message for i in result.errors)
+
     def test_validate_file(self, fixtures_dir: Path) -> None:
         doc, result = validate_file(fixtures_dir / "simple_deny.json")
         assert doc is not None
         assert result.is_valid
+
+    def test_validate_file_reuses_provided_catalog(self, fixtures_dir: Path) -> None:
+        from scpz.config import OptimizerConfig
+
+        path = fixtures_dir / "simple_deny.json"
+        cfg = OptimizerConfig.load(path)
+        catalog = ActionCatalog.load(cfg.spec.catalog)
+        with patch("scpz.validator.ActionCatalog.load") as load_mock:
+            doc, result = validate_file(path, config=cfg, action_catalog=catalog)
+        assert doc is not None
+        assert result.is_valid
+        load_mock.assert_not_called()
 
     def test_validate_complex(self, fixtures_dir: Path) -> None:
         doc, _result = validate_file(fixtures_dir / "complex_multi.json")

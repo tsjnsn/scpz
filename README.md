@@ -121,13 +121,43 @@ scpz validate policy.json
 
 # Validate all JSON files in a directory
 scpz validate policies/
+
+# Machine-readable JSON for CI (stdout only; exit code for pass/fail)
+scpz validate policy.json --format json
 ```
+
+When the path does not exist, human mode prints a single `Path not found` message
+(instead of also printing `No JSON files found`). Empty directories still report
+`No JSON files found`.
 
 ### Check equivalence
 
 ```bash
 # Ensure optimized output did not broaden permissions (catalog model)
 scpz check-equivalence policy.json policy.optimized.json
+
+# JSON result for automation
+scpz check-equivalence policy.json policy.optimized.json --format json
+```
+
+### Machine-readable output (`--format json`)
+
+`validate` and `check-equivalence` accept `--format json` (short `-f json`) to print a
+stable JSON object on **stdout**. Human-oriented Rich output is suppressed in this mode;
+use the process exit code and the `status` / `exit_code` fields in the JSON payload for
+CI decisions.
+
+| Exit code | `validate` | `check-equivalence` |
+| --- | --- | --- |
+| `0` | All checked files passed validation (warnings may be present) | AFTER is same or stricter than BEFORE |
+| `1` | Validation errors, missing path, no `*.json` files, or other failure | Not equivalent, validation failed, missing file, config error, or other failure |
+
+Example (fail the job when validation does not pass):
+
+```bash
+scpz validate policies/ --format json > result.json
+echo "exit=$?"
+jq -e '.status == "ok"' result.json
 ```
 
 ## Optimization Passes
