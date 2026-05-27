@@ -121,14 +121,50 @@ scpz validate policy.json
 
 # Validate all JSON files in a directory
 scpz validate policies/
+
+# Machine-readable JSON for CI (stdout only; exit code unchanged)
+scpz validate policy.json --json
 ```
+
+Exit codes for `validate`:
+
+| Code | Meaning |
+|------|---------|
+| `0` | Every file passed validation (warnings are allowed). |
+| `1` | Path missing, no `*.json` files found, or at least one file has a validation error. |
 
 ### Check equivalence
 
 ```bash
 # Ensure optimized output did not broaden permissions (catalog model)
 scpz check-equivalence policy.json policy.optimized.json
+
+# Machine-readable JSON for CI
+scpz check-equivalence policy.json policy.optimized.json --json
 ```
+
+Exit codes for `check-equivalence`:
+
+| Code | Meaning |
+|------|---------|
+| `0` | Both files validate and `after` is same or stricter than `before`. |
+| `1` | Missing file, config error, validation failure, or equivalence failure. |
+
+### Automation (`--json`)
+
+`validate` and `check-equivalence` accept `--json` to emit a stable JSON document on **stdout** (human-oriented Rich output is suppressed). Parse the payload and use `exit_code` / `status` together with the process exit code:
+
+```bash
+# Fail the job when validation errors exist
+scpz validate policies/ --json | tee result.json
+test "$(jq -r .exit_code result.json)" -eq 0
+
+# Gate deploy on equivalence
+scpz check-equivalence before.json after.json --json > equiv.json
+jq -e '.equivalence.ok' equiv.json
+```
+
+Top-level fields are consistent across both commands: `command`, `version`, `status` (`ok` | `error`), and `exit_code` (mirrors the process exit code). Command-specific details live under `files` / `summary` (`validate`) or `before`, `after`, and `equivalence` (`check-equivalence`). On failure, an `error` string summarizes the primary reason.
 
 ## Optimization Passes
 
