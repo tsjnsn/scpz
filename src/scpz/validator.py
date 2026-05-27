@@ -118,12 +118,15 @@ def validate_file(
     path: str | Path,
     *,
     config: OptimizerConfig | None = None,
+    action_catalog: ActionCatalog | None = None,
 ) -> tuple[ScpDocument | None, ValidationResult]:
     """Validate an SCP JSON file end-to-end.
 
     Loads ``scpz.yaml`` from the file's directory tree (same discovery as
-    ``optimize``) unless *config* is provided. Returns the parsed document (if
-    parseable) and all validation issues.
+    ``optimize``) unless *config* is provided. When *action_catalog* is given,
+    it is used instead of loading the catalog again (for callers that already
+    loaded it). Returns the parsed document (if parseable) and all validation
+    issues.
     """
     p = Path(path)
     text = p.read_text(encoding="utf-8")
@@ -144,11 +147,14 @@ def validate_file(
         result.add_error(f"Invalid scpz.yaml: {exc}")
         return None, result
 
-    try:
-        catalog = ActionCatalog.load(cfg.spec.catalog)
-    except (FileNotFoundError, OSError, json.JSONDecodeError, ValueError) as exc:
-        result.add_error(f"Could not load action catalog ({cfg.spec.catalog.source}): {exc}")
-        return None, result
+    if action_catalog is not None:
+        catalog = action_catalog
+    else:
+        try:
+            catalog = ActionCatalog.load(cfg.spec.catalog)
+        except (FileNotFoundError, OSError, json.JSONDecodeError, ValueError) as exc:
+            result.add_error(f"Could not load action catalog ({cfg.spec.catalog.source}): {exc}")
+            return None, result
 
     doc_result = validate_document(
         doc,

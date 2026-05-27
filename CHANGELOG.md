@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Machine-readable JSON output for `validate` and `check-equivalence` via shared `--format json` / `-f json` flag; documented exit codes for automation.
+- `validate` human mode: one clear error when the path is missing (`Path not found`) vs an empty directory (`No JSON files found`).
+- `check-equivalence` loads the action catalog once and reuses it for validation and equivalence.
 
 ## [0.3.1] - 2026-05-22
 

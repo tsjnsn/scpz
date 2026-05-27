@@ -126,6 +126,10 @@ scpz validate policies/
 scpz validate policy.json --format json
 ```
 
+When the path does not exist, human mode prints a single `Path not found` message
+(instead of also printing `No JSON files found`). Empty directories still report
+`No JSON files found`.
+
 ### Check equivalence
 
 ```bash

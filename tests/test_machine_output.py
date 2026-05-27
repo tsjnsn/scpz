@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 from typing import TYPE_CHECKING, Any
+from unittest.mock import patch
 
 from typer.testing import CliRunner
 
@@ -164,3 +165,16 @@ class TestCheckEquivalenceJsonOutput:
         payload = _parse_json(result.stdout)
         assert payload["equivalent"] is None
         assert "not found" in payload["error"].lower()
+
+    def test_loads_catalog_once(self, fixtures_dir: Path, tmp_path: Path) -> None:
+        src = fixtures_dir / "simple_deny.json"
+        a = tmp_path / "a.json"
+        b = tmp_path / "b.json"
+        shutil.copy2(src, a)
+        shutil.copy2(src, b)
+        from scpz.catalog import ActionCatalog
+
+        with patch("scpz.cli.ActionCatalog.load", wraps=ActionCatalog.load) as load_mock:
+            result = runner.invoke(app, ["check-equivalence", str(a), str(b)])
+        assert result.exit_code == 0
+        assert load_mock.call_count == 1

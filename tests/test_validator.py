@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import textwrap
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 from scpz.catalog import ActionCatalog
 from scpz.config import SUPPORTED_API_VERSION, SUPPORTED_KIND, ValidationConfig
@@ -345,6 +346,18 @@ class TestValidateFileConfig:
         doc, result = validate_file(fixtures_dir / "simple_deny.json")
         assert doc is not None
         assert result.is_valid
+
+    def test_validate_file_reuses_provided_catalog(self, fixtures_dir: Path) -> None:
+        from scpz.config import OptimizerConfig
+
+        path = fixtures_dir / "simple_deny.json"
+        cfg = OptimizerConfig.load(path)
+        catalog = ActionCatalog.load(cfg.spec.catalog)
+        with patch("scpz.validator.ActionCatalog.load") as load_mock:
+            doc, result = validate_file(path, config=cfg, action_catalog=catalog)
+        assert doc is not None
+        assert result.is_valid
+        load_mock.assert_not_called()
 
     def test_validate_complex(self, fixtures_dir: Path) -> None:
         doc, _result = validate_file(fixtures_dir / "complex_multi.json")

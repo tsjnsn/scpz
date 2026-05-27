@@ -452,7 +452,28 @@ def check_equivalence(
         console.print(f"[red]Config error:[/red] {exc}")
         raise typer.Exit(code=1) from exc
 
-    doc_before, val_b = validate_file(before, config=cfg)
+    try:
+        catalog = ActionCatalog.load(cfg.spec.catalog)
+    except (FileNotFoundError, OSError, json.JSONDecodeError, ValueError) as exc:
+        if json_mode:
+            emit_and_exit(
+                build_check_equivalence_payload(
+                    before=before,
+                    after=after,
+                    status="error",
+                    exit_code=1,
+                    equivalent=None,
+                    messages=[],
+                    error=f"Could not load action catalog ({cfg.spec.catalog.source}): {exc}",
+                ),
+                code=1,
+            )
+        console.print(
+            f"[red]Could not load action catalog ({cfg.spec.catalog.source}):[/red] {exc}"
+        )
+        raise typer.Exit(code=1) from exc
+
+    doc_before, val_b = validate_file(before, config=cfg, action_catalog=catalog)
     if not json_mode:
         _print_validation(val_b, before)
     if doc_before is None or not val_b.is_valid:
@@ -472,7 +493,7 @@ def check_equivalence(
             )
         raise typer.Exit(code=1)
 
-    doc_after, val_a = validate_file(after, config=cfg)
+    doc_after, val_a = validate_file(after, config=cfg, action_catalog=catalog)
     if not json_mode:
         _print_validation(val_a, after)
     if doc_after is None or not val_a.is_valid:
@@ -493,7 +514,6 @@ def check_equivalence(
             )
         raise typer.Exit(code=1)
 
-    catalog = ActionCatalog.load(cfg.spec.catalog)
     eq = check_permission_equivalence(doc_before, doc_after, catalog)
     if eq.ok:
         if json_mode:
