@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Machine-readable JSON output for `validate` and `check-equivalence` via shared `--format json` / `-f json` flag; documented exit codes for automation.
+- `validate` human mode: one clear error when the path is missing (`Path not found`) vs an empty directory (`No JSON files found`).
+- `check-equivalence` validates policy JSON/structure before loading the action catalog (so parse errors are not masked by catalog failures), then loads the catalog once for catalog checks and equivalence.
+- `check-equivalence` human mode prints validation warnings on success (same as before JSON output work).
+
 ## [0.3.1] - 2026-05-22
 
 ### Added
