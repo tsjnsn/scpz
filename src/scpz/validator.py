@@ -114,19 +114,11 @@ def validate_document(
     return result
 
 
-def validate_file(
-    path: str | Path,
-    *,
-    config: OptimizerConfig | None = None,
-    action_catalog: ActionCatalog | None = None,
-) -> tuple[ScpDocument | None, ValidationResult]:
-    """Validate an SCP JSON file end-to-end.
+def parse_scp_file(path: str | Path) -> tuple[ScpDocument | None, ValidationResult]:
+    """Parse an SCP JSON file (syntax and document model only).
 
-    Loads ``scpz.yaml`` from the file's directory tree (same discovery as
-    ``optimize``) unless *config* is provided. When *action_catalog* is given,
-    it is used instead of loading the catalog again (for callers that already
-    loaded it). Returns the parsed document (if parseable) and all validation
-    issues.
+    Does not run constraint, action, or catalog checks. Use ``validate_document``
+    or ``validate_file`` for full validation.
     """
     p = Path(path)
     text = p.read_text(encoding="utf-8")
@@ -141,6 +133,28 @@ def validate_file(
         result.add_error(f"Failed to parse SCP document: {exc}")
         return None, result
 
+    return doc, result
+
+
+def validate_file(
+    path: str | Path,
+    *,
+    config: OptimizerConfig | None = None,
+    action_catalog: ActionCatalog | None = None,
+) -> tuple[ScpDocument | None, ValidationResult]:
+    """Validate an SCP JSON file end-to-end.
+
+    Loads ``scpz.yaml`` from the file's directory tree (same discovery as
+    ``optimize``) unless *config* is provided. When *action_catalog* is given,
+    it is used instead of loading the catalog again (for callers that already
+    loaded it). Returns the parsed document (if parseable) and all validation
+    issues.
+    """
+    doc, result = parse_scp_file(path)
+    if doc is None:
+        return None, result
+
+    p = Path(path)
     try:
         cfg = config if config is not None else OptimizerConfig.load(p)
     except ValueError as exc:

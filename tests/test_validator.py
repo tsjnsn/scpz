@@ -342,6 +342,24 @@ class TestValidateFileConfig:
         assert not result.is_valid
         assert any("not in the AWS action catalog" in i.message for i in result.errors)
 
+    def test_parse_scp_file_valid(self, fixtures_dir: Path) -> None:
+        from scpz.validator import parse_scp_file
+
+        doc, result = parse_scp_file(fixtures_dir / "simple_deny.json")
+        assert doc is not None
+        assert result.is_valid
+        assert result.issues == []
+
+    def test_parse_scp_file_invalid_json(self, tmp_path: Path) -> None:
+        from scpz.validator import parse_scp_file
+
+        bad = tmp_path / "bad.json"
+        bad.write_text("{not json", encoding="utf-8")
+        doc, result = parse_scp_file(bad)
+        assert doc is None
+        assert not result.is_valid
+        assert any("Invalid JSON" in i.message for i in result.errors)
+
     def test_validate_file(self, fixtures_dir: Path) -> None:
         doc, result = validate_file(fixtures_dir / "simple_deny.json")
         assert doc is not None

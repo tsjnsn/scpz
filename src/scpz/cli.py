@@ -27,7 +27,13 @@ from scpz.machine_output import (
 from scpz.optimizer import OptimizationResult
 from scpz.optimizer import optimize as run_optimize
 from scpz.splitter import SplitError, split_if_needed
-from scpz.validator import Severity, ValidationResult, validate_document, validate_file
+from scpz.validator import (
+    Severity,
+    ValidationResult,
+    parse_scp_file,
+    validate_document,
+    validate_file,
+)
 
 if TYPE_CHECKING:
     from scpz.models import ScpDocument
@@ -456,10 +462,8 @@ def check_equivalence(
         console.print(f"[red]Config error:[/red] {exc}")
         raise typer.Exit(code=1) from exc
 
-    # Structural validation first (no catalog I/O) so JSON/parse errors are not masked.
-    doc_before, val_b = validate_file(before, config=cfg, action_catalog=ActionCatalog.empty())
-    if not json_mode:
-        _print_validation(val_b, before)
+    # Parse JSON/model first (no catalog I/O) so syntax errors are not masked.
+    doc_before, val_b = parse_scp_file(before)
     if doc_before is None or not val_b.is_valid:
         if json_mode:
             emit_and_exit(
@@ -475,11 +479,10 @@ def check_equivalence(
                 ),
                 code=1,
             )
+        _print_validation(val_b, before)
         raise typer.Exit(code=1)
 
-    doc_after, val_a = validate_file(after, config=cfg, action_catalog=ActionCatalog.empty())
-    if not json_mode:
-        _print_validation(val_a, after)
+    doc_after, val_a = parse_scp_file(after)
     if doc_after is None or not val_a.is_valid:
         if json_mode:
             emit_and_exit(
@@ -496,6 +499,7 @@ def check_equivalence(
                 ),
                 code=1,
             )
+        _print_validation(val_a, after)
         raise typer.Exit(code=1)
 
     try:
@@ -521,11 +525,8 @@ def check_equivalence(
         )
         raise typer.Exit(code=1) from exc
 
-    catalog_b = validate_document(
-        doc_before, validation=cfg.spec.validation, action_catalog=catalog
-    )
-    val_b.issues.extend(catalog_b.issues)
-    if not catalog_b.is_valid:
+    val_b = validate_document(doc_before, validation=cfg.spec.validation, action_catalog=catalog)
+    if not val_b.is_valid:
         if json_mode:
             emit_and_exit(
                 build_check_equivalence_payload(
@@ -541,11 +542,11 @@ def check_equivalence(
                 ),
                 code=1,
             )
+        _print_validation(val_b, before)
         raise typer.Exit(code=1)
 
-    catalog_a = validate_document(doc_after, validation=cfg.spec.validation, action_catalog=catalog)
-    val_a.issues.extend(catalog_a.issues)
-    if not catalog_a.is_valid:
+    val_a = validate_document(doc_after, validation=cfg.spec.validation, action_catalog=catalog)
+    if not val_a.is_valid:
         if json_mode:
             emit_and_exit(
                 build_check_equivalence_payload(
@@ -561,6 +562,7 @@ def check_equivalence(
                 ),
                 code=1,
             )
+        _print_validation(val_a, after)
         raise typer.Exit(code=1)
 
     eq = check_permission_equivalence(doc_before, doc_after, catalog)

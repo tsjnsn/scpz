@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import json
 import shutil
+import textwrap
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from typer.testing import CliRunner
 
 from scpz.cli import app
+from scpz.config import SUPPORTED_API_VERSION, SUPPORTED_KIND
 from scpz.machine_output import SCHEMA_VERSION
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 runner = CliRunner()
 
@@ -181,6 +183,60 @@ class TestCheckEquivalenceJsonOutput:
         load_mock.assert_not_called()
         combined = result.stdout + result.stderr
         assert "Invalid JSON" in combined
+
+    def _write_strict_catalog_config(self, tmp_path: Path) -> None:
+        (tmp_path / "scpz.yaml").write_text(
+            textwrap.dedent(
+                f"""
+                apiVersion: {SUPPORTED_API_VERSION}
+                kind: {SUPPORTED_KIND}
+                spec:
+                  validation:
+                    onUnknownCatalogAction: error
+                """
+            ),
+            encoding="utf-8",
+        )
+
+    def test_validation_issues_not_duplicated_in_json(self, tmp_path: Path) -> None:
+        """Full validation runs once; JSON payloads must not repeat the same issue."""
+        self._write_strict_catalog_config(tmp_path)
+        bad = tmp_path / "bad.json"
+        bad.write_text(
+            '{"Version":"2012-10-17","Statement":[{"Effect":"Deny","Action":"iam:GetRol","Resource":"*"}]}',
+            encoding="utf-8",
+        )
+        ok = tmp_path / "ok.json"
+        ok.write_text(
+            '{"Version":"2012-10-17","Statement":[{"Effect":"Deny","Action":"iam:GetRole","Resource":"*"}]}',
+            encoding="utf-8",
+        )
+        result = runner.invoke(
+            app,
+            ["check-equivalence", "--format", "json", str(bad), str(ok)],
+        )
+        assert result.exit_code == 1
+        payload = _parse_json(result.stdout)
+        issues = payload["before_validation"]["issues"]
+        catalog_msgs = [i for i in issues if "not in the AWS action catalog" in i["message"]]
+        assert len(catalog_msgs) == 1
+
+    def test_catalog_validation_shown_in_human_mode(self, tmp_path: Path) -> None:
+        self._write_strict_catalog_config(tmp_path)
+        before = tmp_path / "before.json"
+        after = tmp_path / "after.json"
+        before.write_text(
+            '{"Version":"2012-10-17","Statement":[{"Effect":"Deny","Action":"iam:GetRol","Resource":"*"}]}',
+            encoding="utf-8",
+        )
+        after.write_text(
+            '{"Version":"2012-10-17","Statement":[{"Effect":"Deny","Action":"iam:GetRole","Resource":"*"}]}',
+            encoding="utf-8",
+        )
+        result = runner.invoke(app, ["check-equivalence", str(before), str(after)])
+        assert result.exit_code == 1
+        combined = (result.stdout + result.stderr).replace("\n", " ")
+        assert combined.count("not in the AWS action catalog") == 1
 
     def test_loads_catalog_once(self, fixtures_dir: Path, tmp_path: Path) -> None:
         src = fixtures_dir / "simple_deny.json"
