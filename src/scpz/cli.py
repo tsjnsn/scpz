@@ -333,7 +333,11 @@ def validate(
     ),
     output_format: FormatOption = OutputFormat.HUMAN,
 ) -> None:
-    """Check SCP JSON against structure, catalog, and configured validation rules."""
+    """Check SCP JSON against structure, catalog, and configured validation rules.
+
+    When the path is missing, human mode prints a single ``Path not found`` message
+    (not ``No JSON files found``). Empty directories still report ``No JSON files found``.
+    """
     json_mode = output_format is OutputFormat.JSON
     files = _resolve_files(path, quiet=True)
     if not files:
@@ -452,28 +456,8 @@ def check_equivalence(
         console.print(f"[red]Config error:[/red] {exc}")
         raise typer.Exit(code=1) from exc
 
-    try:
-        catalog = ActionCatalog.load(cfg.spec.catalog)
-    except (FileNotFoundError, OSError, json.JSONDecodeError, ValueError) as exc:
-        if json_mode:
-            emit_and_exit(
-                build_check_equivalence_payload(
-                    before=before,
-                    after=after,
-                    status="error",
-                    exit_code=1,
-                    equivalent=None,
-                    messages=[],
-                    error=f"Could not load action catalog ({cfg.spec.catalog.source}): {exc}",
-                ),
-                code=1,
-            )
-        console.print(
-            f"[red]Could not load action catalog ({cfg.spec.catalog.source}):[/red] {exc}"
-        )
-        raise typer.Exit(code=1) from exc
-
-    doc_before, val_b = validate_file(before, config=cfg, action_catalog=catalog)
+    # Structural validation first (no catalog I/O) so JSON/parse errors are not masked.
+    doc_before, val_b = validate_file(before, config=cfg, action_catalog=ActionCatalog.empty())
     if not json_mode:
         _print_validation(val_b, before)
     if doc_before is None or not val_b.is_valid:
@@ -493,10 +477,75 @@ def check_equivalence(
             )
         raise typer.Exit(code=1)
 
-    doc_after, val_a = validate_file(after, config=cfg, action_catalog=catalog)
+    doc_after, val_a = validate_file(after, config=cfg, action_catalog=ActionCatalog.empty())
     if not json_mode:
         _print_validation(val_a, after)
     if doc_after is None or not val_a.is_valid:
+        if json_mode:
+            emit_and_exit(
+                build_check_equivalence_payload(
+                    before=before,
+                    after=after,
+                    status="error",
+                    exit_code=1,
+                    equivalent=None,
+                    messages=[],
+                    before_validation=val_b,
+                    after_validation=val_a,
+                    error="Validation failed for AFTER file",
+                ),
+                code=1,
+            )
+        raise typer.Exit(code=1)
+
+    try:
+        catalog = ActionCatalog.load(cfg.spec.catalog)
+    except (FileNotFoundError, OSError, json.JSONDecodeError, ValueError) as exc:
+        if json_mode:
+            emit_and_exit(
+                build_check_equivalence_payload(
+                    before=before,
+                    after=after,
+                    status="error",
+                    exit_code=1,
+                    equivalent=None,
+                    messages=[],
+                    before_validation=val_b,
+                    after_validation=val_a,
+                    error=f"Could not load action catalog ({cfg.spec.catalog.source}): {exc}",
+                ),
+                code=1,
+            )
+        console.print(
+            f"[red]Could not load action catalog ({cfg.spec.catalog.source}):[/red] {exc}"
+        )
+        raise typer.Exit(code=1) from exc
+
+    catalog_b = validate_document(
+        doc_before, validation=cfg.spec.validation, action_catalog=catalog
+    )
+    val_b.issues.extend(catalog_b.issues)
+    if not catalog_b.is_valid:
+        if json_mode:
+            emit_and_exit(
+                build_check_equivalence_payload(
+                    before=before,
+                    after=after,
+                    status="error",
+                    exit_code=1,
+                    equivalent=None,
+                    messages=[],
+                    before_validation=val_b,
+                    after_validation=val_a,
+                    error="Validation failed for BEFORE file",
+                ),
+                code=1,
+            )
+        raise typer.Exit(code=1)
+
+    catalog_a = validate_document(doc_after, validation=cfg.spec.validation, action_catalog=catalog)
+    val_a.issues.extend(catalog_a.issues)
+    if not catalog_a.is_valid:
         if json_mode:
             emit_and_exit(
                 build_check_equivalence_payload(

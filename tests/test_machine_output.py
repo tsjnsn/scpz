@@ -166,6 +166,22 @@ class TestCheckEquivalenceJsonOutput:
         assert payload["equivalent"] is None
         assert "not found" in payload["error"].lower()
 
+    def test_invalid_json_before_catalog_load(self, tmp_path: Path) -> None:
+        """Invalid JSON is reported without loading the action catalog."""
+        before = tmp_path / "before.json"
+        after = tmp_path / "after.json"
+        before.write_text("{not json", encoding="utf-8")
+        after.write_text(
+            '{"Version":"2012-10-17","Statement":[{"Effect":"Deny","Action":"*","Resource":"*"}]}',
+            encoding="utf-8",
+        )
+        with patch("scpz.cli.ActionCatalog.load") as load_mock:
+            result = runner.invoke(app, ["check-equivalence", str(before), str(after)])
+        assert result.exit_code == 1
+        load_mock.assert_not_called()
+        combined = result.stdout + result.stderr
+        assert "Invalid JSON" in combined
+
     def test_loads_catalog_once(self, fixtures_dir: Path, tmp_path: Path) -> None:
         src = fixtures_dir / "simple_deny.json"
         a = tmp_path / "a.json"
