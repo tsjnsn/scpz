@@ -7,7 +7,7 @@ import json
 import shutil
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 from rich.console import Console
@@ -349,7 +349,7 @@ def validate(
             _print_no_files_error(path)
         raise typer.Exit(code=1)
 
-    entries: list[dict[str, object]] = []
+    entries: list[dict[str, Any]] = []
     has_errors = False
     for file_path in files:
         _, val_result = validate_file(file_path)
@@ -395,7 +395,7 @@ def check_equivalence(
     """Verify AFTER did not broaden permissions versus BEFORE (catalog model)."""
     json_mode = output_format is OutputFormat.JSON
 
-    def emit_and_exit(payload: dict[str, object], *, code: int) -> None:
+    def emit_and_exit(payload: dict[str, Any], *, code: int) -> None:
         if json_mode:
             emit_json(payload)
         raise typer.Exit(code=code)
